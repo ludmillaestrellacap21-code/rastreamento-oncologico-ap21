@@ -12,8 +12,24 @@ from supabase import create_client
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+def get_setting(nome, padrao=""):
+    """Lê primeiro variável de ambiente (.env/local) e depois Streamlit Secrets (cloud)."""
+    valor = os.getenv(nome)
+    if valor:
+        return valor
+
+    try:
+        return st.secrets.get(nome, padrao)
+    except Exception:
+        return padrao
+
+
+SUPABASE_URL = get_setting("SUPABASE_URL")
+SUPABASE_PUBLISHABLE_KEY = get_setting("SUPABASE_PUBLISHABLE_KEY")
+APP_URL_CONFIG = get_setting(
+    "APP_URL",
+    "https://rastreamento-oncologico-ap21.streamlit.app",
+)
 
 st.set_page_config(
     page_title="Rastreamento Oncológico | CAP 2.1",
@@ -147,6 +163,30 @@ if st.session_state.session is None:
             st.caption(str(e))
 
 
+def obter_url_atual():
+    """Retorna a URL base correta para OAuth em ambiente local ou Streamlit Cloud."""
+    try:
+        headers = st.context.headers
+        host = headers.get("Host", "") if headers else ""
+        proto = headers.get("X-Forwarded-Proto", "") if headers else ""
+
+        if host:
+            host_lower = host.lower()
+
+            if host_lower.startswith("localhost") or host_lower.startswith("127.0.0.1"):
+                return f"http://{host}"
+
+            return f"{proto or 'https'}://{host}"
+
+    except Exception:
+        pass
+
+    return APP_URL_CONFIG.rstrip("/")
+
+
+REDIRECT_URL = obter_url_atual()
+
+
 def header():
     st.markdown(
         """
@@ -176,7 +216,7 @@ if st.session_state.session is None:
                 {
                     "provider": "google",
                     "options": {
-                        "redirect_to": "http://localhost:8501"
+                        "redirect_to": REDIRECT_URL
                     },
                 }
             )
