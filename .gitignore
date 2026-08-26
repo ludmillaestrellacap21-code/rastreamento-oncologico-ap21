@@ -1,0 +1,11 @@
+.env
+*.db
+*.sqlite
+*.sqlite3
+credencial.json
+banco/
+dados/
+__pycache__/
+*.pyc
+.venv/
+venv/

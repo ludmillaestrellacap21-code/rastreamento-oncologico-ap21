@@ -1,0 +1,25 @@
+MONITORAMENTO DE RASTREAMENTO ONCOLÓGICO — AP 21
+================================================
+
+ESTRUTURA DE PASTAS:
+
+  entrada/
+    vitacare/     → Coloque aqui o relatório geral exportado do VitaCare (.xlsx)
+    sisreg/       → Backups locais da planilha do SISREG (opcional)
+
+  banco/          → Banco SQLite gerado automaticamente (rastreamento.db)
+
+  saida/
+    excel/        → Relatórios Excel gerados pelo relatorio.py
+    logs/         → Registros de execução dos scripts
+
+  scripts/        → Todos os scripts Python do projeto
+
+ORDEM DE EXECUÇÃO:
+  1. setup.py      → apenas na primeira vez
+  2. leitor.py     → leitura e cruzamento dos dados
+  3. relatorio.py  → geração do Excel de saída
+
+FONTES DE DADOS:
+  - VitaCare: exportar relatório geral e salvar em entrada/vitacare/
+  - SISREG: planilha lida automaticamente do Google Sheets (online)
