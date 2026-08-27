@@ -212,6 +212,13 @@ if st.session_state.session is None:
 
     if st.button("Entrar com Google", type="primary", use_container_width=True):
         try:
+    if st.session_state.get("google_oauth_url"):
+        st.link_button(
+            "Continuar com Google",
+            st.session_state["google_oauth_url"],
+            use_container_width=True,
+            type="primary",
+    )
             result = sb.auth.sign_in_with_oauth(
     {
         "provider": "google",
@@ -225,11 +232,8 @@ if st.session_state.session is None:
         },
     }
 )
-            if result.url:
-                st.markdown(
-                    f'<meta http-equiv="refresh" content="0; url={result.url}">',
-                    unsafe_allow_html=True,
-                )
+           if result.url:
+    st.session_state["google_oauth_url"] = result.url
         except Exception as e:
             st.error("Não foi possível iniciar o login com Google.")
             st.caption(str(e))
