@@ -282,40 +282,32 @@ if st.session_state.session is None:
     st.subheader("Acesso ao painel")
     st.caption("Área restrita a usuários autorizados.")
 
-    if st.button("Entrar com Google", type="primary", use_container_width=True):
-        try:
-            result = sb.auth.sign_in_with_oauth(
-                {
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": REDIRECT_URL,
-                        "scopes": (
-                            "openid "
-                            "https://www.googleapis.com/auth/userinfo.email "
-                            "https://www.googleapis.com/auth/userinfo.profile"
-                        ),
-                    },
-                }
+    try:
+        oauth_result = sb.auth.sign_in_with_oauth(
+            {
+                "provider": "google",
+                "options": {
+                    "redirect_to": REDIRECT_URL,
+                    "scopes": (
+                        "openid "
+                        "https://www.googleapis.com/auth/userinfo.email "
+                        "https://www.googleapis.com/auth/userinfo.profile"
+                    ),
+                },
+            }
+        )
+
+        if oauth_result.url:
+            st.link_button(
+                "Entrar com Google",
+                oauth_result.url,
+                use_container_width=True,
+                type="primary",
             )
 
-            if result.url:
-                st.session_state["google_oauth_url"] = result.url
-
-        except Exception as e:
-            st.error("Não foi possível iniciar o login com Google.")
-            st.caption(str(e))
-
-    if st.session_state.get("google_oauth_url"):
-        st.link_button(
-            "Continuar com Google",
-            st.session_state["google_oauth_url"],
-            use_container_width=True,
-            type="primary",
-        )
-        st.caption(
-            "Clique em “Continuar com Google” para abrir a autenticação "
-            "diretamente no navegador."
-        )
+    except Exception as e:
+        st.error("Não foi possível iniciar o login com Google.")
+        st.caption(str(e))
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
