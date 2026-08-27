@@ -156,6 +156,7 @@ if st.session_state.session is None:
             resp = sb.auth.exchange_code_for_session({"auth_code": oauth_code})
             if resp.session:
                 st.session_state.session = resp.session
+                st.session_state.pop("google_oauth_url", None)
                 st.query_params.clear()
                 st.rerun()
         except Exception as e:
@@ -212,31 +213,38 @@ if st.session_state.session is None:
 
     if st.button("Entrar com Google", type="primary", use_container_width=True):
         try:
+            result = sb.auth.sign_in_with_oauth(
+                {
+                    "provider": "google",
+                    "options": {
+                        "redirect_to": REDIRECT_URL,
+                        "scopes": (
+                            "openid "
+                            "https://www.googleapis.com/auth/userinfo.email "
+                            "https://www.googleapis.com/auth/userinfo.profile"
+                        ),
+                    },
+                }
+            )
+
+            if result.url:
+                st.session_state["google_oauth_url"] = result.url
+
+        except Exception as e:
+            st.error("Não foi possível iniciar o login com Google.")
+            st.caption(str(e))
+
     if st.session_state.get("google_oauth_url"):
         st.link_button(
             "Continuar com Google",
             st.session_state["google_oauth_url"],
             use_container_width=True,
             type="primary",
-    )
-            result = sb.auth.sign_in_with_oauth(
-    {
-        "provider": "google",
-        "options": {
-            "redirect_to": REDIRECT_URL,
-            "scopes": (
-                "openid "
-                "https://www.googleapis.com/auth/userinfo.email "
-                "https://www.googleapis.com/auth/userinfo.profile"
-            ),
-        },
-    }
-)
-           if result.url:
-    st.session_state["google_oauth_url"] = result.url
-        except Exception as e:
-            st.error("Não foi possível iniciar o login com Google.")
-            st.caption(str(e))
+        )
+        st.caption(
+            "Clique em “Continuar com Google” para abrir a autenticação "
+            "diretamente no navegador."
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
