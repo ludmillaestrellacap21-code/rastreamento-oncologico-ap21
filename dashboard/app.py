@@ -213,13 +213,18 @@ if st.session_state.session is None:
     if st.button("Entrar com Google", type="primary", use_container_width=True):
         try:
             result = sb.auth.sign_in_with_oauth(
-                {
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": REDIRECT_URL
-                    },
-                }
-            )
+    {
+        "provider": "google",
+        "options": {
+            "redirect_to": REDIRECT_URL,
+            "scopes": (
+                "openid "
+                "https://www.googleapis.com/auth/userinfo.email "
+                "https://www.googleapis.com/auth/userinfo.profile"
+            ),
+        },
+    }
+)
             if result.url:
                 st.markdown(
                     f'<meta http-equiv="refresh" content="0; url={result.url}">',
