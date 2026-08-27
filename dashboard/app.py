@@ -126,18 +126,18 @@ st.markdown(
     }}
 
     div.stButton > button[kind="primary"],
-    div[data-testid="stLinkButton"] a {
+    div[data-testid="stLinkButton"] a {{
         background: #005CA9 !important;
         color: white !important;
         border-color: #005CA9 !important;
-    }
+    }}
 
     div.stButton > button[kind="primary"]:hover,
-    div[data-testid="stLinkButton"] a:hover {
+    div[data-testid="stLinkButton"] a:hover {{
         background: #004A87 !important;
         color: white !important;
         border-color: #004A87 !important;
-    }
+    }}
     footer {{ visibility: hidden; }}
     </style>
     """,
