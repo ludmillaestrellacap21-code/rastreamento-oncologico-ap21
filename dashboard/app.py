@@ -138,6 +138,63 @@ st.markdown(
         color: white !important;
         border-color: #004A87 !important;
     }}
+    .metric-card {{
+        background: white;
+        border: 1px solid #D9E2E8;
+        border-left: 6px solid #8A9BA8;
+        border-radius: 10px;
+        padding: 14px 14px 12px 14px;
+        min-height: 108px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.035);
+    }}
+
+    .metric-card.neutral {{
+        border-left-color: #5B7083;
+        background: #FFFFFF;
+    }}
+
+    .metric-card.success {{
+        border-left-color: #2E7D32;
+        background: #F1F8F2;
+    }}
+
+    .metric-card.warning {{
+        border-left-color: #F39C12;
+        background: #FFF8E8;
+    }}
+
+    .metric-card.info {{
+        border-left-color: #1976D2;
+        background: #EEF5FC;
+    }}
+
+    .metric-card.danger {{
+        border-left-color: #C62828;
+        background: #FDEEEE;
+    }}
+
+    .metric-label {{
+        color: #667985;
+        font-size: .80rem;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 6px;
+    }}
+
+    .metric-value {{
+        color: #17365D;
+        font-size: 1.70rem;
+        font-weight: 800;
+        line-height: 1.05;
+    }}
+
+    .metric-percent {{
+        margin-top: 7px;
+        font-size: .86rem;
+        font-weight: 750;
+        color: #405565;
+    }}
+
     footer {{ visibility: hidden; }}
     </style>
     """,
@@ -532,22 +589,57 @@ def unidade_chart(rows, titulo):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def pct(valor, total):
+    valor = int(valor or 0)
+    total = int(total or 0)
+    if total <= 0:
+        return "0,0%"
+    return f"{(valor / total) * 100:.1f}%".replace(".", ",")
+
+
+def metric_card(label, value, css_class="neutral", percent=None):
+    extra = f'<div class="metric-percent">{percent}</div>' if percent is not None else ""
+    st.markdown(
+        f"""
+        <div class="metric-card {css_class}">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{fmt(value)}</div>
+            {extra}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def cards(resumo, colonoscopia=False):
+    total = int(resumo.get("elegibilidades") or 0)
+
     if colonoscopia:
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Pessoas acompanhadas", fmt(resumo.get("pessoas_unicas")))
-        c2.metric("Registros", fmt(resumo.get("elegibilidades")))
-        c3.metric("Realizado/Confirmado", fmt(resumo.get("realizado_confirmado")))
-        c4.metric("Agendados", fmt(resumo.get("agendados")))
-        c5.metric("Busca ativa", fmt(resumo.get("busca_ativa")))
+        with c1:
+            metric_card("Pessoas acompanhadas", resumo.get("pessoas_unicas"), "neutral")
+        with c2:
+            metric_card("Registros", resumo.get("elegibilidades"), "neutral")
+        with c3:
+            metric_card("Realizado/Confirmado", resumo.get("realizado_confirmado"), "success", pct(resumo.get("realizado_confirmado"), total))
+        with c4:
+            metric_card("Agendados", resumo.get("agendados"), "info", pct(resumo.get("agendados"), total))
+        with c5:
+            metric_card("Busca ativa", resumo.get("busca_ativa"), "danger", pct(resumo.get("busca_ativa"), total))
     else:
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("Pessoas únicas", fmt(resumo.get("pessoas_unicas")))
-        c2.metric("Elegibilidades", fmt(resumo.get("elegibilidades")))
-        c3.metric("Em dia", fmt(resumo.get("em_dia")))
-        c4.metric("Em atraso", fmt(resumo.get("em_atraso")))
-        c5.metric("Agendados", fmt(resumo.get("agendados")))
-        c6.metric("Busca ativa", fmt(resumo.get("busca_ativa")))
+        with c1:
+            metric_card("Pessoas únicas", resumo.get("pessoas_unicas"), "neutral")
+        with c2:
+            metric_card("Elegibilidades", resumo.get("elegibilidades"), "neutral")
+        with c3:
+            metric_card("Em dia", resumo.get("em_dia"), "success", pct(resumo.get("em_dia"), total))
+        with c4:
+            metric_card("Em atraso", resumo.get("em_atraso"), "warning", pct(resumo.get("em_atraso"), total))
+        with c5:
+            metric_card("Agendados", resumo.get("agendados"), "info", pct(resumo.get("agendados"), total))
+        with c6:
+            metric_card("Busca ativa", resumo.get("busca_ativa"), "danger", pct(resumo.get("busca_ativa"), total))
 
 
 def busca_ativa(chave, programa_forcado=None):
