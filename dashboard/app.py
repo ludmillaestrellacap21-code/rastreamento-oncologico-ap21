@@ -633,6 +633,169 @@ def cards(resumo, colonoscopia=False):
         with c6:
             metric_card("Busca ativa", resumo.get("busca_ativa"), "danger", pct(resumo.get("busca_ativa"), total))
 
+def pagina_administracao():
+    st.subheader("Administração e manutenção")
+
+    st.caption(
+        "Área exclusiva para atualização das fontes de dados "
+        "e acompanhamento das cargas do painel."
+    )
+
+    st.markdown("---")
+
+    # =========================================================
+    # FONTE 1 - PLANILHA EXCEL
+    # =========================================================
+
+    st.markdown("### 📄 Fonte 1 — Planilha Excel mensal")
+
+    st.info(
+        "Utilize esta área para selecionar a planilha Excel "
+        "que é substituída mensalmente."
+    )
+
+    arquivo_excel = st.file_uploader(
+        "Selecionar a nova planilha",
+        type=["xlsx", "xls"],
+        key="admin_excel_mensal",
+        help="Selecione o arquivo correspondente à nova competência.",
+    )
+
+    if arquivo_excel is not None:
+
+        tamanho_mb = arquivo_excel.size / (1024 * 1024)
+
+        st.success(
+            f"Arquivo selecionado: {arquivo_excel.name} "
+            f"— {tamanho_mb:.2f} MB"
+        )
+
+        try:
+            preview = pd.read_excel(
+                arquivo_excel,
+                nrows=20
+            )
+
+            st.markdown("#### Prévia da planilha")
+
+            st.dataframe(
+                preview,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.metric(
+                    "Colunas identificadas",
+                    len(preview.columns)
+                )
+
+            with col2:
+                st.metric(
+                    "Linhas exibidas na prévia",
+                    len(preview)
+                )
+
+            st.success(
+                "A estrutura básica da planilha pôde ser lida."
+            )
+
+            if st.button(
+                "Validar arquivo para atualização",
+                type="primary",
+                use_container_width=True,
+                key="admin_validar_excel",
+            ):
+
+                st.session_state["excel_validado"] = True
+
+            if st.session_state.get("excel_validado"):
+
+                st.success(
+                    "✅ Arquivo validado para processamento."
+                )
+
+                st.warning(
+                    "A gravação no Supabase ainda não está ativada. "
+                    "Vamos conectar o processamento da base na próxima etapa."
+                )
+
+        except Exception as e:
+
+            st.error(
+                "Não foi possível ler a planilha selecionada."
+            )
+
+            st.caption(str(e))
+
+    st.markdown("---")
+
+    # =========================================================
+    # FONTE 2 - GOOGLE DRIVE
+    # =========================================================
+
+    st.markdown("### ☁️ Fonte 2 — Planilha do Google Drive")
+
+    st.info(
+        "Esta fonte será consultada automaticamente uma vez por mês."
+    )
+
+    drive1, drive2 = st.columns(2)
+
+    with drive1:
+
+        st.metric(
+            "Periodicidade",
+            "Mensal"
+        )
+
+    with drive2:
+
+        st.metric(
+            "Automação",
+            "A configurar"
+        )
+
+    st.warning(
+        "A sincronização automática com a planilha do Google Drive "
+        "será configurada na próxima etapa."
+    )
+
+    st.markdown("---")
+
+    # =========================================================
+    # HISTÓRICO
+    # =========================================================
+
+    st.markdown("### 🕘 Histórico de atualizações")
+
+    st.caption(
+        "Após ativarmos as cargas, esta área mostrará as "
+        "atualizações realizadas no banco."
+    )
+
+    historico_exemplo = pd.DataFrame(
+        columns=[
+            "Data",
+            "Fonte",
+            "Competência",
+            "Registros",
+            "Usuário",
+            "Status",
+        ]
+    )
+
+    st.dataframe(
+        historico_exemplo,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.info(
+        "Nenhuma atualização registrada pela nova rotina ainda."
+    )
 
 def busca_ativa(chave, programa_forcado=None):
     st.markdown('<div class="section-title">Busca ativa nominal</div>', unsafe_allow_html=True)
@@ -741,9 +904,36 @@ def busca_ativa(chave, programa_forcado=None):
 # =========================================================
 header()
 
-tabs = st.tabs(
-    ["Visão Geral", "Mamografia", "Colo do Útero", "Colorretal", "Busca Ativa"]
-)
+if perfil == "admin":
+
+    abas = st.tabs(
+        [
+            "Visão Geral",
+            "Mamografia",
+            "Colo do Útero",
+            "Colorretal",
+            "Busca Ativa",
+            "⚙️ Administração",
+        ]
+    )
+
+    tab1, tab2, tab3, tab4, tab5, tab_admin = abas
+
+else:
+
+    abas = st.tabs(
+        [
+            "Visão Geral",
+            "Mamografia",
+            "Colo do Útero",
+            "Colorretal",
+            "Busca Ativa",
+        ]
+    )
+
+    tab1, tab2, tab3, tab4, tab5 = abas
+
+    tab_admin = None
 
 u = param(f_unidade)
 e = param(f_equipe)
@@ -864,6 +1054,12 @@ with tabs[3]:
 with tabs[4]:
     busca_ativa("geral", None)
 
+if perfil == "admin" and tab_admin is not None:
+
+    with tab_admin:
+
+        pagina_administracao()
+        
 st.caption(
     "CAP 2.1 — Rastreamento Oncológico | Painel operacional para apoio ao monitoramento e à busca ativa."
 )
