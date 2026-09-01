@@ -679,6 +679,37 @@ def enviar_lote_supabase(
 
     resposta.raise_for_status()
 
+def integrar_google_sheets(
+    sessao,
+):
+    url = (
+        f"{SUPABASE_REST_URL}"
+        "/rpc/integrar_google_sheets"
+    )
+
+    resposta = sessao.post(
+        url,
+        json={},
+        timeout=180,
+    )
+
+    resposta.raise_for_status()
+
+    resultado = resposta.json()
+
+    print()
+    print(
+        "INTEGRACAO COM RASTREAMENTOS CONCLUIDA"
+    )
+    print(
+        json.dumps(
+            resultado,
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+    return resultado
 
 def upsert_lotes(
     sessao,
@@ -933,6 +964,18 @@ def main():
             todos_unicos
         )
 
+        print()
+        print(
+            "Iniciando integracao"
+            "com o painel..."
+        )
+
+        resultado_integracao = (
+            integrar_google_sheets(
+                sessao
+            )
+        )
+        
         atualizar_historico(
             sessao,
             carga_id,
@@ -953,10 +996,9 @@ def main():
                     "sucesso",
 
                 "mensagem": (
-                    "Sincronização Google Sheets "
-                    "concluída. "
-                    f"Duplicidades internas: "
-                    f"{total_duplicados}."
+                    "Sincronização Google Sheets concluída. "
+                    f"Duplicidades internas: {total_duplicados}. "
+                    f"Integração: {json.dumps(resultado_integracao, ensure_ascii=False)}"
                 ),
             },
         )
