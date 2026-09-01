@@ -27,7 +27,7 @@ ABAS = {
 }
 
 
-BATCH_SIZE = 250
+BATCH_SIZE = 100
 
 
 def limpar(valor):
@@ -379,11 +379,12 @@ def processar_laboratorio(
             datetime.utcnow().isoformat(),
     }
 
-
 def upsert_lotes(
     supabase,
     dados,
 ):
+    import time
+
     total = len(dados)
 
     for inicio in range(
@@ -396,20 +397,54 @@ def upsert_lotes(
             inicio + BATCH_SIZE
         ]
 
-        supabase.table(
-            "staging_google_sheets"
-        ).upsert(
-            lote,
-            on_conflict="fonte,chave_origem",
-        ).execute()
+        enviado = False
 
-        print(
-            f"Enviados "
-            f"{min(inicio + BATCH_SIZE, total)} "
-            f"de {total}"
-        )
+        for tentativa in range(1, 6):
 
+            try:
+                supabase.table(
+                    "staging_google_sheets"
+                ).upsert(
+                    lote,
+                    on_conflict="fonte,chave_origem",
+                ).execute()
 
+                enviado = True
+
+                print(
+                    f"Enviados "
+                    f"{min(inicio + BATCH_SIZE, total)} "
+                    f"de {total}"
+                )
+
+                break
+
+            except Exception as erro:
+
+                print(
+                    f"Tentativa {tentativa}/5 falhou "
+                    f"no lote iniciado em {inicio}: "
+                    f"{type(erro).__name__}"
+                )
+
+                if tentativa == 5:
+                    raise
+
+                espera = tentativa * 3
+
+                print(
+                    f"Aguardando {espera}s "
+                    f"antes de tentar novamente..."
+                )
+
+                time.sleep(espera)
+
+        if not enviado:
+            raise RuntimeError(
+                f"Não foi possível enviar o lote "
+                f"iniciado em {inicio}"
+            )
+        
 def main():
     print(
         "INICIANDO SINCRONIZAÇÃO GOOGLE SHEETS"
