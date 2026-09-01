@@ -1,5 +1,6 @@
 import json
 import os
+from collections import Counter
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -8,16 +9,64 @@ from google.oauth2.service_account import Credentials
 SHEET_ID = os.environ["GOOGLE_SHEET_ID"]
 SERVICE_ACCOUNT_JSON = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
 
-ABAS = [
-    "Mamografia Bilateral",
-    "Citopatológico (PAP)",
-    "Colonoscopia",
-    "Sangue Oculto nas Fezes (SO)",
-]
+ABAS = {
+    "Mamografia Bilateral": [
+        "Situação",
+        "Risco",
+        "Agendamento",
+    ],
+    "Colonoscopia": [
+        "Situação",
+        "Risco",
+        "Agendamento",
+    ],
+    "Citopatológico (PAP)": [
+        "Alerta",
+        "Devolutiva",
+        "Exame",
+        "Alterados",
+        "Entrada",
+        "Entrega",
+        "Recebido",
+    ],
+    "Sangue Oculto nas Fezes (SO)": [
+        "Alerta",
+        "Devolutiva",
+        "Exame",
+        "Alterados",
+        "Entrada",
+        "Entrega",
+        "Recebido",
+    ],
+}
+
+
+def limpar_texto(valor):
+    if valor is None:
+        return ""
+
+    return str(valor).strip()
+
+
+def contar_valores(registros, coluna):
+    contador = Counter()
+
+    for registro in registros:
+        valor = limpar_texto(registro.get(coluna))
+
+        if valor == "":
+            valor = "(vazio)"
+
+        contador[valor] += 1
+
+    return contador
 
 
 def main():
-    credenciais_dict = json.loads(SERVICE_ACCOUNT_JSON)
+
+    credenciais_dict = json.loads(
+        SERVICE_ACCOUNT_JSON
+    )
 
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -30,36 +79,104 @@ def main():
     )
 
     client = gspread.authorize(credentials)
-    planilha = client.open_by_key(SHEET_ID)
 
-    print(f"Planilha encontrada: {planilha.title}")
-    print("=" * 70)
+    planilha = client.open_by_key(
+        SHEET_ID
+    )
 
-    for nome_aba in ABAS:
-        try:
-            aba = planilha.worksheet(nome_aba)
+    print(
+        f"Planilha encontrada: {planilha.title}"
+    )
 
-            valores = aba.get_all_values()
+    print("=" * 80)
 
-            total_linhas = len(valores)
-            total_colunas = max(
-                (len(linha) for linha in valores),
-                default=0,
+    for nome_aba, colunas_analisar in ABAS.items():
+
+        print()
+        print("#" * 80)
+        print(f"ABA: {nome_aba}")
+        print("#" * 80)
+
+        aba = planilha.worksheet(
+            nome_aba
+        )
+
+        valores = aba.get_all_values()
+
+        if not valores:
+
+            print("Aba vazia.")
+            continue
+
+        # Normaliza os nomes das colunas.
+        # Isso resolve, por exemplo, "CNS " com espaço.
+        cabecalhos = [
+            limpar_texto(x)
+            for x in valores[0]
+        ]
+
+        registros = []
+
+        for linha in valores[1:]:
+
+            registro = {}
+
+            for indice, coluna in enumerate(
+                cabecalhos
+            ):
+
+                valor = (
+                    linha[indice]
+                    if indice < len(linha)
+                    else ""
+                )
+
+                registro[coluna] = valor
+
+            registros.append(
+                registro
             )
 
-            print(f"Aba: {nome_aba}")
-            print(f"Linhas: {total_linhas}")
-            print(f"Colunas: {total_colunas}")
+        print(
+            f"Registros de dados: {len(registros)}"
+        )
 
-            if total_linhas > 0:
-                print("Cabeçalhos:")
-                print(valores[0])
+        print(
+            f"Colunas encontradas: {cabecalhos}"
+        )
 
-            print("-" * 70)
+        for coluna in colunas_analisar:
 
-        except Exception as e:
-            print(f"ERRO ao acessar a aba '{nome_aba}': {e}")
-            print("-" * 70)
+            print()
+            print("-" * 80)
+            print(
+                f"COLUNA: {coluna}"
+            )
+            print("-" * 80)
+
+            if coluna not in cabecalhos:
+
+                print(
+                    "Coluna não encontrada."
+                )
+
+                continue
+
+            contador = contar_valores(
+                registros,
+                coluna
+            )
+
+            for valor, quantidade in (
+                contador.most_common()
+            ):
+
+                print(
+                    f"{quantidade:>7} | {valor}"
+                )
+
+        print()
+        print("=" * 80)
 
 
 if __name__ == "__main__":
