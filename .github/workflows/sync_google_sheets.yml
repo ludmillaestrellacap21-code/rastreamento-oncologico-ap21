@@ -3,6 +3,9 @@ name: Atualizacao Google Sheets
 on:
   workflow_dispatch:
 
+  schedule:
+    - cron: "0 9 10 * *" 
+
 jobs:
   atualizar:
     runs-on: ubuntu-latest
