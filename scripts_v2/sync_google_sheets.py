@@ -7,11 +7,19 @@ from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
-from supabase import create_client
+import requests
+import time
+
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+SUPABASE_REST_URL = (
+    SUPABASE_URL.rstrip("/")
+    + "/rest/v1"
+)
 
 GOOGLE_SHEET_ID = os.environ["GOOGLE_SHEET_ID"]
 GOOGLE_SERVICE_ACCOUNT_JSON = os.environ[
@@ -444,16 +452,147 @@ def upsert_lotes(
                 f"Não foi possível enviar o lote "
                 f"iniciado em {inicio}"
             )
+
+def criar_sessao_supabase():
+
+    retry = Retry(
+        total=5,
+        connect=5,
+        read=5,
+        backoff_factor=2,
+        status_forcelist=[
+            429,
+            500,
+            502,
+            503,
+            504,
+        ],
+        allowed_methods=[
+            "GET",
+            "POST",
+            "PATCH",
+            "DELETE",
+        ],
+    )
+
+    adapter = HTTPAdapter(
+        max_retries=retry
+    )
+
+    sessao = requests.Session()
+
+    sessao.mount(
+        "https://",
+        adapter,
+    )
+
+    sessao.headers.update({
+        "apikey": SUPABASE_KEY,
+        "Authorization":
+            f"Bearer {SUPABASE_KEY}",
+        "Content-Type":
+            "application/json",
+    })
+
+    return sessao
+
+
+def inserir_historico(
+    sessao,
+    dados,
+):
+
+    url = (
+        f"{SUPABASE_REST_URL}"
+        f"/historico_cargas"
+    )
+
+    resposta = sessao.post(
+        url,
+        params={
+            "select": "id"
+        },
+        headers={
+            "Prefer":
+                "return=representation"
+        },
+        json=dados,
+        timeout=60,
+    )
+
+    resposta.raise_for_status()
+
+    resultado = resposta.json()
+
+    if resultado:
+        return resultado[0]["id"]
+
+    return None
+
+
+def atualizar_historico(
+    sessao,
+    carga_id,
+    dados,
+):
+
+    if not carga_id:
+        return
+
+    url = (
+        f"{SUPABASE_REST_URL}"
+        f"/historico_cargas"
+    )
+
+    resposta = sessao.patch(
+        url,
+        params={
+            "id": f"eq.{carga_id}"
+        },
+        headers={
+            "Prefer":
+                "return=minimal"
+        },
+        json=dados,
+        timeout=60,
+    )
+
+    resposta.raise_for_status()
+
+
+def enviar_lote_supabase(
+    sessao,
+    lote,
+):
+
+    url = (
+        f"{SUPABASE_REST_URL}"
+        f"/staging_google_sheets"
+    )
+
+    resposta = sessao.post(
+        url,
+        params={
+            "on_conflict":
+                "fonte,chave_origem"
+        },
+        headers={
+            "Prefer":
+                "resolution=merge-duplicates,"
+                "return=minimal"
+        },
+        json=lote,
+        timeout=120,
+    )
+
+    resposta.raise_for_status()
         
 def main():
     print(
         "INICIANDO SINCRONIZAÇÃO GOOGLE SHEETS"
     )
 
-    supabase = create_client(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-    )
+    sessao = criar_sessao_supabase()
 
     credenciais = json.loads(
         GOOGLE_SERVICE_ACCOUNT_JSON
@@ -483,17 +622,22 @@ def main():
         f"Planilha: {planilha.title}"
     )
 
-    inicio_carga = (
-        supabase
-        .table("historico_cargas")
-        .insert({
-            "fonte": "Google Sheets",
-            "competencia":
-                datetime.now().strftime("%Y-%m"),
-            "status": "processando",
-        })
-        .execute()
-    )
+    carga_id = inserir_historico(
+    sessao,
+    {
+        "fonte": "Google Sheets",
+        "competencia":
+            datetime.now().strftime(
+                "%Y-%m"
+            ),
+        "status": "processando",
+    },
+)
+
+print(
+    f"Carga iniciada. ID: "
+    f"{carga_id}"
+)
 
     carga_id = (
         inicio_carga.data[0]["id"]
@@ -579,89 +723,86 @@ def main():
             f"{len(todos)}"
         )
 
-        upsert_lotes(
-            supabase,
-            todos,
-        )
+        def upsert_lotes(
+    sessao,
+    todos,
+):
+    total = len(dados)
 
-        if carga_id:
-            (
-                supabase
-                .table("historico_cargas")
-                .update({
-                    "fim_em":
-                        datetime.utcnow().isoformat(),
+    for inicio in range(
+        0,
+        total,
+        BATCH_SIZE,
+    ):
 
-                    "registros_lidos":
-                        total_lidos,
+        lote = dados[
+            inicio:
+            inicio + BATCH_SIZE
+        ]
 
-                    "registros_processados":
-                        total_processados,
+        for tentativa in range(1, 6):
 
-                    "registros_erro":
-                        total_erros,
+            try:
 
-                    "status": "sucesso",
-
-                    "mensagem":
-                        "Sincronização Google Sheets concluída.",
-                })
-                .eq(
-                    "id",
-                    carga_id,
+                enviar_lote_supabase(
+                    sessao,
+                    lote,
                 )
-                .execute()
-            )
 
-        print()
-        print(
-            "SINCRONIZAÇÃO CONCLUÍDA"
-        )
-
-        print(
-            f"Lidos: {total_lidos}"
-        )
-
-        print(
-            f"Processados: "
-            f"{total_processados}"
-        )
-
-        print(
-            f"Ignorados/erros: "
-            f"{total_erros}"
-        )
-
-    except Exception as erro:
-
-        if carga_id:
-            (
-                supabase
-                .table("historico_cargas")
-                .update({
-                    "fim_em":
-                        datetime.utcnow().isoformat(),
-
-                    "registros_lidos":
-                        total_lidos,
-
-                    "registros_processados":
-                        total_processados,
-
-                    "registros_erro":
-                        total_erros,
-
-                    "status": "erro",
-
-                    "mensagem":
-                        str(erro)[:1000],
-                })
-                .eq(
-                    "id",
-                    carga_id,
+                print(
+                    f"Enviados "
+                    f"{min(inicio + BATCH_SIZE, total)} "
+                    f"de {total}"
                 )
-                .execute()
-            )
+
+                break
+
+            except Exception as erro:
+
+                print(
+                    f"Tentativa "
+                    f"{tentativa}/5 "
+                    f"falhou: "
+                    f"{type(erro).__name__}"
+                )
+
+                if tentativa == 5:
+                    raise
+
+                espera = tentativa * 3
+
+                print(
+                    f"Aguardando "
+                    f"{espera}s..."
+                )
+
+                time.sleep(
+                    espera
+                )
+
+    atualizar_historico(
+    sessao,
+    carga_id,
+    {
+        "fim_em":
+            datetime.utcnow().isoformat(),
+
+        "registros_lidos":
+            total_lidos,
+
+        "registros_processados":
+            total_processados,
+
+        "registros_erro":
+            total_erros,
+
+        "status":
+            "erro",
+
+        "mensagem":
+            str(erro)[:1000],
+    },
+)
 
         raise
 
