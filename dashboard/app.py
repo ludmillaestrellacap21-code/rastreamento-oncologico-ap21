@@ -115,31 +115,115 @@ st.markdown(
     div.stButton > button[kind="primary"]:hover, div[data-testid="stLinkButton"] a:hover {{
         background: #004A87 !important; color: white !important; border-color: #004A87 !important;
     }}
-    .metric-card {{
-        background: white; border: 1px solid #D9E2E8; border-left: 6px solid #8A9BA8;
-        border-radius: 10px; padding: 14px 14px 12px 14px; min-height: 108px;
+        .metric-card {{
+        background: white;
+        border: 1px solid #D9E2E8;
+        border-left: 5px solid #8A9BA8;
+        border-radius: 12px;
+        padding: 15px 16px 13px 16px;
+        min-height: 112px;
         box-shadow: 0 1px 4px rgba(0,0,0,.035);
+        margin-bottom: 6px;
     }}
-    .metric-card.neutral {{ border-left-color: #5B7083; }}
-    .metric-card.success {{ border-left-color: #2E7D32; background: #F1F8F2; }}
-    .metric-card.warning {{ border-left-color: #D79B00; background: #FFF9E8; }}
-    .metric-card.info {{ border-left-color: #1976D2; background: #EEF5FC; }}
-    .metric-card.danger {{ border-left-color: #C62828; background: #FDEEEE; }}
-    .metric-label {{ color: #667985; font-size: .80rem; font-weight: 700; line-height: 1.2; margin-bottom: 6px; }}
-    .metric-value {{ color: #17365D; font-size: 1.70rem; font-weight: 800; line-height: 1.05; }}
-    .metric-percent {{ margin-top: 7px; font-size: .86rem; font-weight: 750; color: #405565; }}
+
+    .metric-card.neutral {{
+        border-left-color: #5B7083;
+    }}
+
+    .metric-card.success {{
+        border-left-color: #2E7D32;
+        background: #F1F8F2;
+    }}
+
+    .metric-card.warning {{
+        border-left-color: #D79B00;
+        background: #FFF9E8;
+    }}
+
+    .metric-card.info {{
+        border-left-color: #1976D2;
+        background: #EEF5FC;
+    }}
+
+    .metric-card.danger {{
+        border-left-color: #C62828;
+        background: #FDEEEE;
+    }}
+
+    .metric-label {{
+        color: #667985;
+        font-size: .80rem;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 7px;
+    }}
+
+    .metric-value {{
+        color: #17365D;
+        font-size: 1.72rem;
+        font-weight: 800;
+        line-height: 1.05;
+    }}
+
+    .metric-percent {{
+        margin-top: 8px;
+        font-size: .86rem;
+        font-weight: 750;
+        color: #405565;
+    }}
+
     .update-strip {{
-        display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:10px;
-        margin: 4px 0 16px 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 16px;
+        margin: 4px 0 22px 0;
     }}
+
     .update-card {{
-        background:white; border:1px solid #D9E2E8; border-radius:10px; padding:12px 14px;
+        background: white;
+        border: 1px solid #D9E2E8;
+        border-radius: 12px;
+        padding: 14px 16px;
+        min-height: 92px;
     }}
-    .update-label {{ font-size:.78rem; color:#667985; font-weight:700; }}
-    .update-value {{ font-size:.98rem; color:#17365D; font-weight:750; margin-top:3px; }}
-    .update-detail {{ font-size:.78rem; color:#667985; margin-top:3px; }}
-    @media (max-width: 700px) {{ .update-strip {{ grid-template-columns:1fr; }} }}
-    footer {{ visibility: hidden; }}
+
+    .update-label {{
+        font-size: .78rem;
+        color: #667985;
+        font-weight: 700;
+    }}
+
+    .update-value {{
+        font-size: .98rem;
+        color: #17365D;
+        font-weight: 750;
+        margin-top: 5px;
+    }}
+
+    .update-detail {{
+        font-size: .78rem;
+        color: #667985;
+        margin-top: 5px;
+    }}
+
+    .kpi-space {{
+        height: 12px;
+    }}
+
+    .kpi-group-title {{
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #7A8B98;
+        font-weight: 700;
+        margin: 2px 0 8px 2px;
+    }}
+
+    @media (max-width: 700px) {{
+        .update-strip {{
+            grid-template-columns: 1fr;
+        }}
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -485,29 +569,196 @@ fl = param(f_fluxo)
 # =========================================================
 def cards(resumo, colonoscopia=False):
     total = int(resumo.get("elegibilidades") or 0)
+
+    # =====================================================
+    # COLONOSCOPIA
+    # =====================================================
     if colonoscopia:
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: metric_card("Pessoas acompanhadas", resumo.get("pessoas_unicas"), "neutral")
-        with c2: metric_card("Registros", resumo.get("elegibilidades"), "neutral")
-        with c3: metric_card("Agendados + confirmados", int(resumo.get("agendados") or 0) + int(resumo.get("confirmados") or 0), "info")
-        with c4: metric_card("Falta - Reconvocar", resumo.get("faltas"), "danger")
-        with c5: metric_card("Pendente regulação", resumo.get("pendente_regulacao"), "warning")
+        st.markdown(
+            '<div class="kpi-group-title">Resumo do acompanhamento</div>',
+            unsafe_allow_html=True,
+        )
+
+        c1, c2, c3, c4 = st.columns(4, gap="large")
+
+        with c1:
+            metric_card(
+                "Pessoas acompanhadas",
+                resumo.get("pessoas_unicas"),
+                "neutral",
+            )
+
+        with c2:
+            metric_card(
+                "Registros",
+                resumo.get("elegibilidades"),
+                "neutral",
+            )
+
+        with c3:
+            total_agendado = (
+                int(resumo.get("agendados") or 0)
+                + int(resumo.get("confirmados") or 0)
+            )
+
+            metric_card(
+                "Agendados / Confirmados",
+                total_agendado,
+                "info",
+            )
+
+        with c4:
+            metric_card(
+                "Falta - Reconvocar",
+                resumo.get("faltas"),
+                "danger",
+            )
+
+        st.markdown(
+            '<div class="kpi-space"></div>',
+            unsafe_allow_html=True,
+        )
+
+        c5, c6 = st.columns([1, 3], gap="large")
+
+        with c5:
+            metric_card(
+                "Pendente regulação",
+                resumo.get("pendente_regulacao"),
+                "warning",
+            )
+
         return
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    with c1: metric_card("Pessoas únicas", resumo.get("pessoas_unicas"), "neutral")
-    with c2: metric_card("Elegibilidades", resumo.get("elegibilidades"), "neutral")
-    with c3: metric_card("Em dia", resumo.get("em_dia"), "success", pct(resumo.get("em_dia"), total))
-    with c4: metric_card("Vence em 90 dias", resumo.get("vence_90"), "warning", pct(resumo.get("vence_90"), total))
-    with c5: metric_card("Em atraso", resumo.get("em_atraso"), "danger", pct(resumo.get("em_atraso"), total))
-    with c6: metric_card("Busca ativa", resumo.get("busca_ativa"), "danger", pct(resumo.get("busca_ativa"), total))
+    # =====================================================
+    # LINHA 1 — PRINCIPAIS
+    # =====================================================
+    st.markdown(
+        '<div class="kpi-group-title">Situação geral</div>',
+        unsafe_allow_html=True,
+    )
 
-    c7, c8, c9, c10 = st.columns(4)
-    with c7: metric_card("Sem registro de realização", resumo.get("sem_registro"), "neutral", pct(resumo.get("sem_registro"), total))
-    with c8: metric_card("Agendados", resumo.get("agendados"), "info")
-    with c9: metric_card("Confirmados", resumo.get("confirmados"), "info")
-    with c10: metric_card("Falta - Reconvocar", resumo.get("faltas"), "danger")
+    c1, c2, c3, c4 = st.columns(4, gap="large")
 
+    with c1:
+        metric_card(
+            "Pessoas únicas",
+            resumo.get("pessoas_unicas"),
+            "neutral",
+        )
+
+    with c2:
+        metric_card(
+            "Elegibilidades",
+            resumo.get("elegibilidades"),
+            "neutral",
+        )
+
+    with c3:
+        metric_card(
+            "Em dia",
+            resumo.get("em_dia"),
+            "success",
+            pct(
+                resumo.get("em_dia"),
+                total,
+            ),
+        )
+
+    with c4:
+        metric_card(
+            "Busca ativa",
+            resumo.get("busca_ativa"),
+            "danger",
+            pct(
+                resumo.get("busca_ativa"),
+                total,
+            ),
+        )
+
+    st.markdown(
+        '<div class="kpi-space"></div>',
+        unsafe_allow_html=True,
+    )
+
+    # =====================================================
+    # LINHA 2 — SITUAÇÃO TEMPORAL
+    # =====================================================
+    st.markdown(
+        '<div class="kpi-group-title">Situação temporal</div>',
+        unsafe_allow_html=True,
+    )
+
+    c5, c6, c7 = st.columns(3, gap="large")
+
+    with c5:
+        metric_card(
+            "Sem registro de realização",
+            resumo.get("sem_registro"),
+            "neutral",
+            pct(
+                resumo.get("sem_registro"),
+                total,
+            ),
+        )
+
+    with c6:
+        metric_card(
+            "Vence em 90 dias",
+            resumo.get("vence_90"),
+            "warning",
+            pct(
+                resumo.get("vence_90"),
+                total,
+            ),
+        )
+
+    with c7:
+        metric_card(
+            "Em atraso",
+            resumo.get("em_atraso"),
+            "danger",
+            pct(
+                resumo.get("em_atraso"),
+                total,
+            ),
+        )
+
+    st.markdown(
+        '<div class="kpi-space"></div>',
+        unsafe_allow_html=True,
+    )
+
+    # =====================================================
+    # LINHA 3 — FLUXO OPERACIONAL
+    # =====================================================
+    st.markdown(
+        '<div class="kpi-group-title">Fluxo operacional</div>',
+        unsafe_allow_html=True,
+    )
+
+    c8, c9, c10 = st.columns(3, gap="large")
+
+    with c8:
+        metric_card(
+            "Agendados",
+            resumo.get("agendados"),
+            "info",
+        )
+
+    with c9:
+        metric_card(
+            "Confirmados",
+            resumo.get("confirmados"),
+            "info",
+        )
+
+    with c10:
+        metric_card(
+            "Falta - Reconvocar",
+            resumo.get("faltas"),
+            "danger",
+        )
 
 def status_chart(rows, titulo):
     df = pd.DataFrame(rows)
