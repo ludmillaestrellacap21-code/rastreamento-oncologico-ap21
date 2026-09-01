@@ -7,9 +7,9 @@ Regras usadas:
 - Colonoscopia: acompanhamento/seguimento; somente quem possui registro de
   colonoscopia no SISREG. Nao e gerada como populacao-alvo universal.
 
-Importante: a classificacao usa a data de agendamento confirmado como proxy
-para a ultima realizacao porque essa e a informacao disponivel no banco atual.
-Quando houver uma fonte de "realizado/resultado", ela deve substituir essa proxy.
+Importante: agendamento confirmado NÃO é tratado como exame realizado.
+A rotina manual atualiza população, elegibilidade, eventos e fluxo operacional.
+A situação temporal do painel é calculada apenas a partir de data comprovada de realização.
 
 Uso:
     py scripts_v2/supabase_sync.py --test
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import sqlite3
 import time
 from datetime import date, datetime
@@ -186,35 +187,22 @@ def idade_atual(row):
     return hoje.year - d.year - ((hoje.month, hoje.day) < (d.month, d.day))
 
 
-def calcular_status(programa, situacao, data_agendamento):
-    """Classifica o estado atual por programa.
-
-    Para os programas populacionais, "Agendamento Confirmado" é usado como
-    proxy de realização enquanto não houver uma data de procedimento realizado.
-    """
-    situacao = val(situacao) or "Sem registro"
-
-    if programa == "colonoscopia":
-        if situacao in ["✅ Agendamento Confirmado", "Agendamento confirmado"]:
-            return "Realizado/Confirmado"
-        if situacao == "❌ Agendamento Falta":
-            return "Falta - Reconvocar"
-        if situacao == "📅 Agendada":
-            return "Agendado"
-        return "Em acompanhamento"
-
-    if situacao in ["✅ Agendamento Confirmado", "Agendamento confirmado"]:
-        dt = norm_date(data_agendamento)
-        if not dt:
-            return "Em atraso"
-        d = datetime.strptime(dt, "%Y-%m-%d").date()
-        anos_passados = (date.today() - d).days / 365.25
-        return "Em dia" if anos_passados <= REGRAS[programa]["prazo_anos"] else "Em atraso"
-    if situacao == "❌ Agendamento Falta":
-        return "Falta - Reconvocar"
-    if situacao == "📅 Agendada":
-        return "Agendado"
-    return "Nunca realizado"
+def calcular_fluxo(situacao):
+    situacao = val(situacao) or "Sem movimentação"
+    mapa = {
+        "✅ Agendamento Confirmado": "Confirmado",
+        "Agendamento confirmado": "Confirmado",
+        "❌ Agendamento Falta": "Falta - Reconvocar",
+        "📅 Agendada": "Agendado",
+        "⏳ Pendente Regulação": "Pendente regulação",
+        "❌ Agendamento Cancelado": "Cancelado",
+        "❌ Cancelada": "Cancelado",
+        "↩️ Devolvida": "Devolvido",
+        "🔄 Reenviada": "Reenviado",
+        "🚫 Negada": "Negado",
+        "◾ Óbito": "Óbito",
+    }
+    return mapa.get(situacao, situacao)
 
 
 def ultimo_evento_por_programa(ag, programa):
@@ -272,10 +260,11 @@ def construir_populacao_corrigida(pacientes, ag):
             for c in ["situacao", "risco", "data_agendamento", "data_solicitacao", "unidade_solicitante", "procedimento"]:
                 pop[c] = None
 
-        pop["status_rastreamento"] = pop.apply(
-            lambda r: calcular_status(programa, r.get("situacao"), r.get("data_agendamento")),
-            axis=1,
+        pop["status_rastreamento"] = (
+            "Seguimento" if programa == "colonoscopia"
+            else "Sem registro de realização"
         )
+        pop["status_fluxo"] = pop["situacao"].apply(calcular_fluxo)
         frames.append(pop)
         print(f"Regra {programa}: {len(pop):,} combinações CNS + programa.")
 
@@ -319,8 +308,41 @@ def testar_conexao():
     print(f"Tabela programas acessível: {resposta.data[:1]}")
 
 
+def iniciar_historico_manual(sb):
+    try:
+        usuario = os.getenv("USERNAME") or os.getenv("USER") or "Rotina local"
+        resp = sb.table("historico_cargas").insert({
+            "fonte": "Base mensal / SQLite",
+            "competencia": date.today().strftime("%Y-%m"),
+            "status": "processando",
+            "tipo_carga": "manual",
+            "usuario": usuario,
+        }).execute()
+        return resp.data[0]["id"] if resp.data else None
+    except Exception as exc:
+        print(f"Aviso: não foi possível iniciar histórico da carga manual: {exc}")
+        return None
+
+
+def finalizar_historico_manual(sb, carga_id, lidos, processados, erros=0):
+    if not carga_id:
+        return
+    try:
+        sb.table("historico_cargas").update({
+            "fim_em": datetime.now().astimezone().isoformat(),
+            "registros_lidos": int(lidos),
+            "registros_processados": int(processados),
+            "registros_erro": int(erros),
+            "status": "sucesso",
+            "mensagem": "Sincronização manual da base mensal concluída.",
+        }).eq("id", carga_id).execute()
+    except Exception as exc:
+        print(f"Aviso: não foi possível finalizar histórico da carga manual: {exc}")
+
+
 def sync(reset_tracking=False):
     sb = client()
+    carga_id = iniciar_historico_manual(sb)
     print(f"Banco SQLite: {DB_PATH}")
     print("Lendo pacientes e agendamentos locais...")
     pacientes, ag = read_sqlite()
@@ -375,7 +397,8 @@ def sync(reset_tracking=False):
         r_rows.append({
             "paciente_id": pid,
             "programa_codigo": prog,
-            "status_rastreamento": val(r.get("status_rastreamento")) or "Nunca realizado",
+            "status_rastreamento": val(r.get("status_rastreamento")) or "Sem registro de realização",
+            "status_fluxo": val(r.get("status_fluxo")),
             "risco": val(r.get("risco")),
             "ultima_data_agendamento": norm_date(r.get("data_agendamento")),
             "ultima_data_solicitacao": norm_date(r.get("data_solicitacao")),
@@ -453,6 +476,14 @@ def sync(reset_tracking=False):
         a_rows,
         "programa_codigo,chave_origem",
         "Solicitações/agendamentos",
+    )
+
+    finalizar_historico_manual(
+        sb,
+        carga_id,
+        lidos=len(pacientes) + len(ag),
+        processados=len(p_rows) + len(e_rows) + len(r_rows) + len(a_rows),
+        erros=sem_id + ag_sem_paciente,
     )
 
     print("\nSINCRONIZAÇÃO V2 CONCLUÍDA COM SUCESSO.")

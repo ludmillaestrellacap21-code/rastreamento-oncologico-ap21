@@ -385,6 +385,9 @@ def processar_agendamento(
         "alterado": False,
         "alerta": False,
 
+        "data_nascimento_origem": None,
+        "sexo_origem": None,
+
         "atualizado_em":
             agora_iso(),
     }
@@ -527,6 +530,22 @@ def processar_laboratorio(
                     "Alerta"
                 )
             ),
+
+        "data_nascimento_origem":
+            parse_data(
+                registro.get(
+                    "Nascimento"
+                )
+            ),
+
+        "sexo_origem": (
+            limpar(
+                registro.get(
+                    "Sexo"
+                )
+            )
+            or None
+        ),
 
         "atualizado_em":
             agora_iso(),
@@ -678,6 +697,45 @@ def enviar_lote_supabase(
     )
 
     resposta.raise_for_status()
+
+def enviar_inconsistencias(
+    sessao,
+    dados,
+):
+    if not dados:
+        return
+
+    url = (
+        f"{SUPABASE_REST_URL}"
+        "/inconsistencias_google_sheets"
+    )
+
+    total = len(dados)
+
+    for inicio in range(0, total, BATCH_SIZE):
+        lote = dados[inicio:inicio + BATCH_SIZE]
+
+        resposta = sessao.post(
+            url,
+            params={
+                "on_conflict":
+                    "fonte,chave_origem,motivo"
+            },
+            headers={
+                "Prefer":
+                    "resolution=merge-duplicates,"
+                    "return=minimal"
+            },
+            json=lote,
+            timeout=120,
+        )
+
+        resposta.raise_for_status()
+
+    print(
+        f"Inconsistências cadastrais registradas: {total}"
+    )
+
 
 def integrar_google_sheets(
     sessao,
@@ -845,6 +903,12 @@ def main():
 
             "status":
                 "processando",
+
+            "tipo_carga":
+                "automatica",
+
+            "usuario":
+                "GitHub Actions",
         },
     )
 
@@ -860,6 +924,7 @@ def main():
 
     try:
         todos = []
+        rejeitados = []
 
         for nome_aba, programa in ABAS.items():
             print()
@@ -907,10 +972,26 @@ def main():
                             )
                         )
 
-                    # Sem CNS não integramos
-                    # à base nominal.
-                    if not item["cns"]:
+                    # Registros sem CNS ou com CNS fora do padrão
+                    # não entram na base nominal, mas passam a ser
+                    # registrados para tratamento administrativo.
+                    cns_item = item.get("cns") or ""
+
+                    if len(cns_item) != 15:
                         total_erros += 1
+
+                        rejeitados.append({
+                            "fonte": item.get("fonte"),
+                            "programa_codigo": item.get("programa_codigo"),
+                            "chave_origem": item.get("chave_origem"),
+                            "cns_informado": cns_item or None,
+                            "nome": item.get("nome"),
+                            "unidade": item.get("unidade"),
+                            "data_nascimento_origem": item.get("data_nascimento_origem"),
+                            "sexo_origem": item.get("sexo_origem"),
+                            "motivo": "CNS ausente ou inválido",
+                            "atualizado_em": agora_iso(),
+                        })
                         continue
 
                     todos.append(
@@ -960,13 +1041,18 @@ def main():
             todos_unicos,
         )
 
+        enviar_inconsistencias(
+            sessao,
+            rejeitados,
+        )
+
         total_processados = len(
             todos_unicos
         )
 
         print()
         print(
-            "Iniciando integracao"
+            "Iniciando integracao "
             "com o painel..."
         )
 
@@ -998,6 +1084,7 @@ def main():
                 "mensagem": (
                     "Sincronização Google Sheets concluída. "
                     f"Duplicidades internas: {total_duplicados}. "
+                    f"Inconsistências sem CNS válido: {len(rejeitados)}. "
                     f"Integração: {json.dumps(resultado_integracao, ensure_ascii=False)}"
                 ),
             },
@@ -1035,6 +1122,11 @@ def main():
         print(
             f"Ignorados/erros: "
             f"{total_erros}"
+        )
+
+        print(
+            f"Inconsistências cadastrais: "
+            f"{len(rejeitados)}"
         )
 
         print(
