@@ -1346,15 +1346,47 @@ def pagina_administracao():
         "antes da atualização da base populacional."
     )
     arquivo_vitacare = st.file_uploader("Selecionar arquivo FICHA A do VitaCare", type=["csv"], key="admin_excel_mensal")
+
     if arquivo_vitacare is not None:
-        tamanho_mb = arquivo_vitacare.size/(1024*1024)
-        st.success(f"Arquivo selecionado: {arquivo_vitacare.name} — {tamanho_mb:.2f} MB")
+        tamanho_mb = arquivo_vitacare.size / (1024 * 1024)
+
+        st.success(
+            f"Arquivo selecionado: {arquivo_vitacare.name} — "
+            f"{tamanho_mb:.2f} MB"
+        )
+
         try:
-            preview = pd.read_csv(arquivo_vitacare, nrows=20)
-            st.dataframe(preview, use_container_width=True, hide_index=True)
-            st.caption(f"Prévia: {len(preview)} linhas · {len(preview.columns)} colunas")
+            # Garante que a leitura comece do início do arquivo
+            arquivo_vitacare.seek(0)
+
+            preview = pd.read_csv(
+                arquivo_vitacare,
+                sep=";",
+                encoding="latin1",
+                dtype=str,
+                nrows=20,
+                low_memory=False,
+            )
+
+            st.success(
+                "Arquivo VitaCare reconhecido com sucesso."
+            )
+
+            st.dataframe(
+                preview,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.caption(
+                f"Prévia: {len(preview)} linhas · "
+                f"{len(preview.columns)} colunas"
+            )
+
         except Exception as e:
-            st.error("Não foi possível ler o arquivo VitaCare.")
+            st.error(
+                "Não foi possível ler o arquivo VitaCare."
+            )
             st.caption(str(e))
 
     st.divider()
