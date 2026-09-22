@@ -856,60 +856,440 @@ def indicadores_operacionais(programa):
 
 
 def busca_ativa(chave, programa_forcado=None):
-    st.markdown('<div class="section-title">Busca ativa nominal</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="section-note">Situação temporal e fluxo operacional aparecem separados. Agendamento confirmado não equivale a realização.</div>',
+        '<div class="section-title">Busca ativa nominal</div>',
         unsafe_allow_html=True,
     )
 
-    busca = st.text_input("Buscar por nome ou CNS", key=f"busca_{chave}", placeholder="Digite parte do nome ou CNS")
-    page_size = st.selectbox("Registros por página", [50,100,250,500], index=1, key=f"ps_{chave}")
+    st.markdown(
+        """
+        <div class="section-note">
+        Fila nominal organizada por prioridade.
+        A situação temporal e o fluxo operacional são apresentados separadamente.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # =====================================================
+    # PRIORIDADE
+    # =====================================================
+
+    prioridade_map = {
+        "Todas as prioridades": None,
+        "🔴 P1 — Em atraso":
+            "Prioridade 1 - Em atraso",
+
+        "🟠 P2 — Vence em até 30 dias":
+            "Prioridade 2 - Vence em até 30 dias",
+
+        "🟡 P3 — Vence entre 31 e 60 dias":
+            "Prioridade 3 - Vence entre 31 e 60 dias",
+
+        "🟢 P4 — Vence entre 61 e 90 dias":
+            "Prioridade 4 - Vence entre 61 e 90 dias",
+
+        "⚪ P5 — Sem registro de realização":
+            "Prioridade 5 - Sem registro de realização",
+    }
+
+    st.markdown(
+        "#### Prioridade da busca ativa"
+    )
+
+    prioridade_nome = st.selectbox(
+        "Selecionar prioridade",
+        list(prioridade_map.keys()),
+        key=f"prioridade_{chave}",
+        label_visibility="collapsed",
+    )
+
+    prioridade = prioridade_map[
+        prioridade_nome
+    ]
+
+    # =====================================================
+    # EXPLICAÇÃO DAS PRIORIDADES
+    # =====================================================
+
+    p1, p2, p3, p4, p5 = st.columns(5)
+
+    with p1:
+        st.markdown(
+            """
+            <div class="metric-card danger">
+                <div class="metric-label">
+                    PRIORIDADE 1
+                </div>
+                <div class="metric-value"
+                     style="font-size:1.15rem;">
+                    Em atraso
+                </div>
+                <div class="metric-percent">
+                    Intervenção imediata
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with p2:
+        st.markdown(
+            """
+            <div class="metric-card danger">
+                <div class="metric-label">
+                    PRIORIDADE 2
+                </div>
+                <div class="metric-value"
+                     style="font-size:1.15rem;">
+                    Até 30 dias
+                </div>
+                <div class="metric-percent">
+                    Alta prioridade
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with p3:
+        st.markdown(
+            """
+            <div class="metric-card warning">
+                <div class="metric-label">
+                    PRIORIDADE 3
+                </div>
+                <div class="metric-value"
+                     style="font-size:1.15rem;">
+                    31–60 dias
+                </div>
+                <div class="metric-percent">
+                    Programar contato
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with p4:
+        st.markdown(
+            """
+            <div class="metric-card success">
+                <div class="metric-label">
+                    PRIORIDADE 4
+                </div>
+                <div class="metric-value"
+                     style="font-size:1.15rem;">
+                    61–90 dias
+                </div>
+                <div class="metric-percent">
+                    Busca preventiva
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with p5:
+        st.markdown(
+            """
+            <div class="metric-card neutral">
+                <div class="metric-label">
+                    PRIORIDADE 5
+                </div>
+                <div class="metric-value"
+                     style="font-size:1.15rem;">
+                    Sem registro
+                </div>
+                <div class="metric-percent">
+                    Avaliar histórico
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<div class="kpi-space"></div>',
+        unsafe_allow_html=True,
+    )
+
+    # =====================================================
+    # BUSCA
+    # =====================================================
+
+    c_busca, c_paginas = st.columns(
+        [3, 1],
+        gap="large",
+    )
+
+    with c_busca:
+        busca = st.text_input(
+            "Buscar por nome ou CNS",
+            key=f"busca_{chave}",
+            placeholder="Digite parte do nome ou CNS",
+        )
+
+    with c_paginas:
+        page_size = st.selectbox(
+            "Registros por página",
+            [50, 100, 250, 500],
+            index=1,
+            key=f"ps_{chave}",
+        )
+
     page_key = f"page_{chave}"
+
     if page_key not in st.session_state:
         st.session_state[page_key] = 0
 
-    col_a, col_b, _ = st.columns([1,1,4])
+    # Se mudar a prioridade, volta para primeira página.
+    prioridade_state = (
+        f"prioridade_anterior_{chave}"
+    )
+
+    if (
+        st.session_state.get(
+            prioridade_state
+        ) != prioridade
+    ):
+        st.session_state[page_key] = 0
+
+        st.session_state[
+            prioridade_state
+        ] = prioridade
+
+    col_a, col_b, _ = st.columns(
+        [1, 1, 4]
+    )
+
     with col_a:
-        if st.button("← Anterior", key=f"prev_{chave}"):
-            st.session_state[page_key] = max(0, st.session_state[page_key]-1)
+        if st.button(
+            "← Anterior",
+            key=f"prev_{chave}",
+        ):
+            st.session_state[
+                page_key
+            ] = max(
+                0,
+                st.session_state[
+                    page_key
+                ] - 1,
+            )
+
     with col_b:
-        if st.button("Próxima →", key=f"next_{chave}"):
-            st.session_state[page_key] += 1
+        if st.button(
+            "Próxima →",
+            key=f"next_{chave}",
+        ):
+            st.session_state[
+                page_key
+            ] += 1
 
-    page = st.session_state[page_key]
-    rows = rpc("dashboard2_busca", {
-        "p_busca": busca.strip() or None,
-        "p_unidade": u, "p_equipe": e, "p_microarea": m,
-        "p_programa": programa_forcado or f_programa,
-        "p_status": s, "p_fluxo": fl,
-        "p_limit": page_size, "p_offset": page * page_size,
-    }) or []
+    page = st.session_state[
+        page_key
+    ]
 
-    total = rows[0].get("total_registros",0) if rows else 0
-    st.caption(f"Página {page+1} · {fmt(total)} registro(s) encontrado(s)")
+    # =====================================================
+    # RPC
+    # =====================================================
+
+    rows = rpc(
+        "dashboard2_busca",
+        {
+            "p_busca":
+                busca.strip() or None,
+
+            "p_unidade": u,
+
+            "p_equipe": e,
+
+            "p_microarea": m,
+
+            "p_programa":
+                programa_forcado
+                or f_programa,
+
+            "p_status": s,
+
+            "p_fluxo": fl,
+
+            "p_prioridade":
+                prioridade,
+
+            "p_limit":
+                page_size,
+
+            "p_offset":
+                page * page_size,
+        },
+    ) or []
+
+    total = (
+        rows[0].get(
+            "total_registros",
+            0,
+        )
+        if rows
+        else 0
+    )
+
+    # =====================================================
+    # CABEÇALHO DA LISTA
+    # =====================================================
+
+    st.markdown(
+        '<div class="section-title">'
+        'Lista nominal'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if prioridade:
+        st.caption(
+            f"{prioridade_nome} · "
+            f"{fmt(total)} paciente(s)"
+        )
+    else:
+        st.caption(
+            f"Todas as prioridades · "
+            f"{fmt(total)} paciente(s)"
+        )
+
+    st.caption(
+        f"Página {page + 1}"
+    )
+
     df = pd.DataFrame(rows)
+
     if df.empty:
-        st.info("Nenhum registro encontrado.")
+        st.info(
+            "Nenhum registro encontrado "
+            "para os filtros selecionados."
+        )
         return
+
     if "total_registros" in df.columns:
-        df = df.drop(columns=["total_registros"])
+        df = df.drop(
+            columns=[
+                "total_registros"
+            ]
+        )
+
+    # =====================================================
+    # FORMATAÇÃO
+    # =====================================================
 
     rename = {
-        "nome":"Nome", "cns":"CNS", "idade":"Idade", "unidade":"Unidade",
-        "equipe":"Equipe", "microarea":"Microárea", "programa":"Programa",
-        "status_rastreamento":"Situação do rastreamento", "status_fluxo":"Fluxo operacional",
-        "data_ultima_realizacao":"Última realização", "data_proxima_referencia":"Próxima referência",
-        "dias_para_vencer":"Dias para vencer", "data_agendamento":"Agendamento",
-        "data_solicitacao":"Solicitação", "situacao":"Situação origem", "risco":"Risco",
-    }
-    cols = [c for c in [
-        "nome","cns","idade","unidade","equipe","microarea","programa",
-        "status_rastreamento","status_fluxo","data_ultima_realizacao",
-        "data_proxima_referencia","dias_para_vencer","data_agendamento",
-        "data_solicitacao","risco"
-    ] if c in df.columns]
-    st.dataframe(df[cols].rename(columns=rename), use_container_width=True, hide_index=True, height=520)
+    "prioridade": "Prioridade",
+    "nome": "Nome",
+    "cns": "CNS",
+    "idade": "Idade",
+    "unidade": "Unidade",
+    "equipe": "Equipe",
+    "programa": "Programa",
+    "status_rastreamento": "Situação temporal",
+    "status_fluxo": "Fluxo operacional",
+    "dias_para_vencer": "Dias para vencer",
+    "data_proxima_referencia": "Próxima referência",
+    "microarea": "Microárea",
+    "data_ultima_realizacao": "Última realização",
+    "data_agendamento": "Agendamento",
+    "data_solicitacao": "Solicitação",
+    "risco": "Risco",
+}
 
+    cols = [
+    c
+    for c in [
+        "prioridade",
+        "nome",
+        "cns",
+        "idade",
+        "unidade",
+        "equipe",
+        "programa",
+        "status_rastreamento",
+        "status_fluxo",
+        "dias_para_vencer",
+        "data_proxima_referencia",
+        "microarea",
+        "data_ultima_realizacao",
+        "data_agendamento",
+        "data_solicitacao",
+        "risco",
+    ]
+    if c in df.columns
+]
+
+    st.dataframe(
+    df[cols].rename(columns=rename),
+    use_container_width=True,
+    hide_index=True,
+    height=560,
+    column_config={
+        "Prioridade": st.column_config.TextColumn(
+            "Prioridade",
+            width="medium",
+        ),
+        "Nome": st.column_config.TextColumn(
+            "Nome",
+            width="large",
+        ),
+        "CNS": st.column_config.TextColumn(
+            "CNS",
+            width="medium",
+        ),
+        "Idade": st.column_config.NumberColumn(
+            "Idade",
+            width="small",
+        ),
+        "Unidade": st.column_config.TextColumn(
+            "Unidade",
+            width="large",
+        ),
+        "Equipe": st.column_config.TextColumn(
+            "Equipe",
+            width="medium",
+        ),
+        "Programa": st.column_config.TextColumn(
+            "Programa",
+            width="medium",
+        ),
+        "Situação temporal": st.column_config.TextColumn(
+            "Situação temporal",
+            width="medium",
+        ),
+        "Fluxo operacional": st.column_config.TextColumn(
+            "Fluxo operacional",
+            width="medium",
+        ),
+        "Dias para vencer": st.column_config.NumberColumn(
+            "Dias para vencer",
+            width="small",
+        ),
+        "Próxima referência": st.column_config.DateColumn(
+            "Próxima referência",
+            format="DD/MM/YYYY",
+            width="medium",
+        ),
+        "Última realização": st.column_config.DateColumn(
+            "Última realização",
+            format="DD/MM/YYYY",
+            width="medium",
+        ),
+        "Agendamento": st.column_config.DateColumn(
+            "Agendamento",
+            format="DD/MM/YYYY",
+            width="medium",
+        ),
+        "Solicitação": st.column_config.DateColumn(
+            "Solicitação",
+            format="DD/MM/YYYY",
+            width="medium",
+        ),
+    },
+)
 
 def pagina_nao_localizados():
     st.markdown("### Qualidade cadastral — pacientes não localizados")
@@ -961,14 +1341,16 @@ def pagina_administracao():
 
     st.markdown("### 📄 Fonte manual — base mensal")
     st.info(
-        "O upload abaixo continua em modo de validação. A atualização manual efetiva é registrada quando a rotina local de sincronização é executada."
+        "Envie o arquivo FICHA A exportado do VitaCare."
+        "Nesta etapa o sistema realiza a validação do arquivo."
+        "antes da atualização da base populacional."
     )
-    arquivo_excel = st.file_uploader("Selecionar planilha mensal", type=["xlsx","xls"], key="admin_excel_mensal")
-    if arquivo_excel is not None:
-        tamanho_mb = arquivo_excel.size/(1024*1024)
-        st.success(f"Arquivo selecionado: {arquivo_excel.name} — {tamanho_mb:.2f} MB")
+    arquivo_vitacare = st.file_uploader("Selecionar arquivo FICHA A do VitaCare", type=["csv"], key="admin_excel_mensal")
+    if arquivo_vitacare is not None:
+        tamanho_mb = arquivo_vitacare.size/(1024*1024)
+        st.success(f"Arquivo selecionado: {arquivo_vitacare.name} — {tamanho_mb:.2f} MB")
         try:
-            preview = pd.read_excel(arquivo_excel, nrows=20)
+            preview = pd.read_excel(arquivo_vitacare, nrows=20)
             st.dataframe(preview, use_container_width=True, hide_index=True)
             st.caption(f"Prévia: {len(preview)} linhas · {len(preview.columns)} colunas")
         except Exception as e:
