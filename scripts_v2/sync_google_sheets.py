@@ -11,14 +11,26 @@ import requests
 from google.oauth2.service_account import Credentials
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from dotenv import load_dotenv
+from pathlib import Path
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(ENV_FILE)
 
 # ============================================================
 # CONFIGURAÇÕES
 # ============================================================
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_SECRET_KEY")
+)
+
+if not SUPABASE_KEY:
+    raise RuntimeError(
+        "Chave administrativa do Supabase não encontrada."
+    )
 
 SUPABASE_REST_URL = (
     SUPABASE_URL.rstrip("/")
@@ -769,6 +781,33 @@ def integrar_google_sheets(
 
     return resultado
 
+def atualizar_painel_rastreamento(
+    sessao,
+):
+    url = (
+        f"{SUPABASE_REST_URL}"
+        "/rpc/refresh_painel_rastreamento"
+    )
+
+    print()
+    print(
+        "ATUALIZANDO PAINEL DE RASTREAMENTO..."
+    )
+
+    resposta = sessao.post(
+        url,
+        json={},
+        timeout=600,
+    )
+
+    resposta.raise_for_status()
+
+    print(
+        "PAINEL DE RASTREAMENTO ATUALIZADO"
+    )
+
+    return True
+
 def upsert_lotes(
     sessao,
     dados,
@@ -1060,6 +1099,10 @@ def main():
             integrar_google_sheets(
                 sessao
             )
+        )
+
+        atualizar_painel_rastreamento(
+            sessao
         )
         
         atualizar_historico(
