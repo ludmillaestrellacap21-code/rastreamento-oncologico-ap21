@@ -1350,7 +1350,7 @@ def pagina_administracao():
         tamanho_mb = arquivo_vitacare.size/(1024*1024)
         st.success(f"Arquivo selecionado: {arquivo_vitacare.name} — {tamanho_mb:.2f} MB")
         try:
-            preview = pd.read_vitacare(arquivo_vitacare, nrows=20)
+            preview = pd.read_csv(arquivo_vitacare, nrows=20)
             st.dataframe(preview, use_container_width=True, hide_index=True)
             st.caption(f"Prévia: {len(preview)} linhas · {len(preview.columns)} colunas")
         except Exception as e:
