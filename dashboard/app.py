@@ -1368,8 +1368,65 @@ def pagina_administracao():
                 low_memory=False,
             )
 
+            COLUNAS_VITACARE_OBRIGATORIAS = [
+                "N_CNS_DA_PESSOA_CADASTRADA",
+                "NOME_DA_PESSOA_CADASTRADA",
+                "DATA_DE_NASCIMENTO",
+                "SEXO",
+                "NOME_UNIDADE_DE_SAUDE",
+                "NOME_EQUIPE_DE_SAUDE",
+                "CODIGO_MICROAREA",
+                "SITUACAO_USUARIO",
+            ]
+
+            import unicodedata
+            import re
+
+            def normalizar_coluna(nome):
+                nome = str(nome).strip().upper()
+
+                nome = unicodedata.normalize("NFKD", nome)
+                nome = "".join(
+                    caractere
+                    for caractere in nome
+                    if not unicodedata.combining(caractere)
+                )
+
+                nome = re.sub(r"[^A-Z0-9]+", "_", nome)
+                nome = nome.strip("_")
+
+                return nome
+
+            colunas_encontradas = [
+                normalizar_coluna(coluna)
+                for coluna in preview.columns
+            ]
+
+            colunas_ausentes = [
+                coluna
+                for coluna in COLUNAS_VITACARE_OBRIGATORIAS
+                if normalizar_coluna(coluna) not in colunas_encontradas
+            ]
+
+            if colunas_ausentes:
+                st.error(
+                    "Arquivo incompatível com a FICHA A do VitaCare."
+                )
+
+                st.warning(
+                    "Colunas obrigatórias não encontradas: "
+                    + ", ".join(colunas_ausentes)
+                )
+
+                st.stop()
+
             st.success(
-                "Arquivo VitaCare reconhecido com sucesso."
+                "✓ Arquivo FICHA A reconhecido e validado com sucesso."
+            )
+
+            st.caption(
+                "Todas as 8 colunas obrigatórias da base "
+                "populacional foram identificadas."
             )
 
             st.dataframe(
