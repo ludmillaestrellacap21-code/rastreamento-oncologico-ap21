@@ -1429,6 +1429,54 @@ def pagina_administracao():
                 "populacional foram identificadas."
             )
 
+            st.markdown("#### Atualização da base populacional")
+
+            st.info(
+                "O arquivo foi validado, mas nenhuma alteração foi "
+                "realizada na base até o momento."
+            )
+
+            confirmar_atualizacao = st.checkbox(
+                "Confirmo que este é o arquivo FICHA A que deverá "
+                "substituir a base populacional atual.",
+                key="confirmar_atualizacao_vitacare",
+            )
+
+            if st.button(
+                "Atualizar base populacional",
+                type="primary",
+                disabled=not confirmar_atualizacao,
+                use_container_width=True,
+                key="btn_atualizar_base_vitacare",
+            ):
+                st.session_state["vitacare_confirmado"] = True
+            if st.session_state.get("vitacare_confirmado"):
+                st.warning(
+                    "Confirmação final: a nova FICHA A será utilizada "
+                    "para reconstruir a população e recalcular as "
+                    "elegibilidades e rastreamentos."
+                )
+
+                col1, col2 = st.columns([1, 1])
+
+                with col1:
+                    if st.button(
+                        "Cancelar",
+                        use_container_width=True,
+                        key="cancelar_vitacare",
+                    ):
+                        st.session_state["vitacare_confirmado"] = False
+                        st.rerun()
+
+                with col2:
+                    if st.button(
+                        "Confirmar atualização",
+                        type="primary",
+                        use_container_width=True,
+                        key="confirmar_vitacare",
+                    ):
+                        st.session_state["vitacare_processar"] = True
+
             st.dataframe(
                 preview,
                 use_container_width=True,

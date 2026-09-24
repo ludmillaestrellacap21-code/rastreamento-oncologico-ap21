@@ -8,4 +8,4 @@ dados/
 __pycache__/
 *.pyc
 .venv/
-venv/
+venv/entrada/vitacare/*.csv

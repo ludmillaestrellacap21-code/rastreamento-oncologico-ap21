@@ -5,9 +5,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 steps = [
-    (ROOT/'scripts'/'leitor.py', 'Processar VitaCare + SISREG no SQLite'),
-    (ROOT/'scripts_v2'/'supabase_sync.py', 'Sincronizar Supabase'),
-    (ROOT/'scripts'/'relatorio.py', 'Atualizar BigQuery e Excel'),
+    (
+        ROOT / 'scripts' / 'leitor.py',
+        'Processar VitaCare + SISREG no SQLite'
+    ),
+    (
+        ROOT / 'scripts_v2' / 'supabase_sync.py',
+        'Sincronizar Supabase'
+    ),
 ]
 for script, label in steps:
     print(f'\n=== {label} ===')

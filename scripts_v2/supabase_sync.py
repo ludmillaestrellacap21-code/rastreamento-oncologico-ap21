@@ -23,6 +23,7 @@ import hashlib
 import os
 import sqlite3
 import time
+import requests
 from datetime import date, datetime
 
 import pandas as pd
@@ -339,6 +340,58 @@ def finalizar_historico_manual(sb, carga_id, lidos, processados, erros=0):
     except Exception as exc:
         print(f"Aviso: não foi possível finalizar histórico da carga manual: {exc}")
 
+    url = (
+        f"{SUPABASE_URL.rstrip('/')}"
+        "/rest/v1/rpc/refresh_painel_rastreamento"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    print()
+    print("ATUALIZANDO PAINEL DE RASTREAMENTO...")
+
+    resposta = requests.post(
+        url,
+        headers=headers,
+        json={},
+        timeout=600,
+    )
+
+    resposta.raise_for_status()
+
+    print("PAINEL DE RASTREAMENTO ATUALIZADO")
+
+def atualizar_painel_rastreamento():
+    url = (
+        f"{SUPABASE_URL.rstrip('/')}"
+        "/rest/v1/rpc/refresh_painel_rastreamento"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    print()
+    print("ATUALIZANDO PAINEL DE RASTREAMENTO...")
+
+    resposta = requests.post(
+        url,
+        headers=headers,
+        json={},
+        timeout=600,
+    )
+
+    resposta.raise_for_status()
+
+    print("PAINEL DE RASTREAMENTO ATUALIZADO")
+
+    return True
 
 def sync(reset_tracking=False):
     sb = client()
@@ -486,6 +539,7 @@ def sync(reset_tracking=False):
         erros=sem_id + ag_sem_paciente,
     )
 
+    atualizar_painel_rastreamento()
     print("\nSINCRONIZAÇÃO V2 CONCLUÍDA COM SUCESSO.")
     print(f"Pacientes únicos: {len(p_rows):,}")
     print(f"Elegibilidades CNS+programa: {len(e_rows):,}")
