@@ -1034,19 +1034,53 @@ def atualizar_painel_rastreamento(
         "ATUALIZANDO PAINEL DE RASTREAMENTO..."
     )
 
-    resposta = sessao.post(
-        url,
-        json={},
-        timeout=600,
-    )
+    try:
+        resposta = sessao.post(
+            url,
+            json={},
+            timeout=600,
+        )
 
-    resposta.raise_for_status()
+        if not resposta.ok:
+            print()
+            print(
+                "AVISO: O REFRESH DO PAINEL "
+                "NAO FOI CONCLUIDO."
+            )
+            print(
+                f"HTTP {resposta.status_code}"
+            )
+            print(
+                resposta.text[:1000]
+            )
+            print(
+                "A CARGA E AS INTEGRACOES "
+                "FORAM CONCLUIDAS."
+            )
 
-    print(
-        "PAINEL DE RASTREAMENTO ATUALIZADO"
-    )
+            return False
 
-    return True
+        print(
+            "PAINEL DE RASTREAMENTO ATUALIZADO"
+        )
+
+        return True
+
+    except Exception as erro:
+        print()
+        print(
+            "AVISO: FALHA AO ATUALIZAR "
+            "O PAINEL DE RASTREAMENTO."
+        )
+        print(
+            f"{type(erro).__name__}: {erro}"
+        )
+        print(
+            "A CARGA E AS INTEGRACOES "
+            "FORAM CONCLUIDAS."
+        )
+
+        return False
 
 def upsert_lotes(
     sessao,
@@ -1356,8 +1390,10 @@ def main():
             )
         )
 
-        atualizar_painel_rastreamento(
-            sessao
+        painel_atualizado = (
+            atualizar_painel_rastreamento(
+                sessao
+            )
         )
         
         atualizar_historico(
