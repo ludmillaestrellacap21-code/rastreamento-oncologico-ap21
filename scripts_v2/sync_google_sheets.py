@@ -877,7 +877,7 @@ def enviar_lote_supabase(
         }
         for item in lote
     ]
-    
+
     url = (
         f"{SUPABASE_REST_URL}"
         "/staging_google_sheets"
@@ -966,6 +966,50 @@ def integrar_google_sheets(
     print()
     print(
         "INTEGRACAO COM RASTREAMENTOS CONCLUIDA"
+    )
+    print(
+        json.dumps(
+            resultado,
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+    return resultado
+def integrar_dna_hpv(
+    sessao,
+):
+    url = (
+        f"{SUPABASE_REST_URL}"
+        "/rpc/integrar_dna_hpv"
+    )
+
+    print()
+    print(
+        "INTEGRANDO DNA-HPV..."
+    )
+
+    resposta = sessao.post(
+        url,
+        json={},
+        timeout=300,
+    )
+
+    if not resposta.ok:
+        print()
+        print(
+            "ERRO NA INTEGRACAO DNA-HPV:"
+        )
+        print(resposta.status_code)
+        print(resposta.text)
+        print()
+
+    resposta.raise_for_status()
+
+    resultado = resposta.json()
+
+    print(
+        "INTEGRACAO DNA-HPV CONCLUIDA"
     )
     print(
         json.dumps(
@@ -1294,18 +1338,6 @@ def main():
             todos_unicos
         )
 
-        # ====================================================
-        # TESTE TEMPORÃRIO DNA-HPV
-        # Para apÃ³s gravar no staging.
-        # ====================================================
-        print()
-        print("STAGING ATUALIZADO.")
-        print(
-            "TESTE DNA-HPV: integraÃ§Ã£o com rastreamentos "
-            "temporariamente pausada."
-        )
-        return
-
         print()
         print(
             "Iniciando integracao "
@@ -1314,6 +1346,12 @@ def main():
 
         resultado_integracao = (
             integrar_google_sheets(
+                sessao
+            )
+        )
+
+        resultado_dna_hpv = (
+            integrar_dna_hpv(
                 sessao
             )
         )
