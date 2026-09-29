@@ -49,6 +49,7 @@ ABAS = {
     "Colonoscopia": "colonoscopia",
     "Citopatológico (PAP)": "citopatologico",
     "Sangue Oculto nas Fezes (SO)": "sangue_oculto",
+    "DNA-HPV": "dna_hpv",
 }
 
 
@@ -563,6 +564,179 @@ def processar_laboratorio(
             agora_iso(),
     }
 
+def processar_dna_hpv(registro, programa, nome_aba):
+    cns = normalizar_cns(
+        registro.get("CNS")
+    )
+
+    nome = limpar(
+        registro.get("Paciente")
+    )
+
+    unidade = limpar(
+        registro.get("Unidade")
+    )
+
+    resultado_original = limpar(
+        registro.get("Resultado")
+    )
+
+    conduta_original = limpar(
+        registro.get("Conduta")
+    )
+
+    situacao_original = limpar(
+        registro.get("Situação")
+    )
+
+    data_liberacao = parse_data(
+        registro.get("Data de liberação")
+    )
+
+    # --------------------------------------------------------
+    # NORMALIZAÇÃO DO RESULTADO DNA-HPV
+    # --------------------------------------------------------
+    resultado_limpo = sem_acentos(
+        resultado_original
+    )
+
+    if resultado_limpo == "nao detectavel":
+        resultado_normalizado = "negativo"
+        genotipo_hpv = None
+
+    elif "16" in resultado_limpo and "alto risco" in resultado_limpo:
+        resultado_normalizado = "hpv16_alto_risco"
+        genotipo_hpv = "16"
+
+    elif resultado_limpo in (
+        "detectavel: 16",
+        "detectavel 16",
+    ):
+        resultado_normalizado = "hpv16"
+        genotipo_hpv = "16"
+
+    elif resultado_limpo in (
+        "detectavel: 18",
+        "detectavel 18",
+    ):
+        resultado_normalizado = "hpv18"
+        genotipo_hpv = "18"
+
+    elif "alto risco" in resultado_limpo:
+        resultado_normalizado = "alto_risco"
+        genotipo_hpv = None
+
+    elif not resultado_limpo:
+        resultado_normalizado = "incompleto"
+        genotipo_hpv = None
+
+    else:
+        resultado_normalizado = "nao_classificado"
+        genotipo_hpv = None
+
+    # --------------------------------------------------------
+    # NORMALIZAÇÃO DA CONDUTA
+    # --------------------------------------------------------
+    conduta_limpa = sem_acentos(
+        conduta_original
+    )
+
+    if "resultado negativo" in conduta_limpa:
+        conduta_normalizada = "resultado_negativo"
+
+    elif "resultado incompleto" in conduta_limpa:
+        conduta_normalizada = "resultado_incompleto"
+
+    elif "citologia reflexa" in conduta_limpa:
+        conduta_normalizada = "citologia_reflexa"
+
+    elif "colposcopia direta" in conduta_limpa:
+        conduta_normalizada = "colposcopia_direta"
+
+    elif not conduta_limpa:
+        conduta_normalizada = None
+
+    else:
+        conduta_normalizada = "nao_classificada"
+
+    # --------------------------------------------------------
+    # CHAVE ÚNICA DA ORIGEM
+    # --------------------------------------------------------
+    chave = chave_hash(
+        programa,
+        cns,
+        data_liberacao,
+        resultado_original,
+        conduta_original,
+    )
+
+    return {
+        "fonte": nome_aba,
+        "programa_codigo": programa,
+        "chave_origem": chave,
+
+        "cns": cns or None,
+        "nome": nome or None,
+        "unidade": unidade or None,
+
+        "data_solicitacao": None,
+        "data_agendamento": None,
+
+        "situacao_origem":
+            situacao_original or None,
+
+        "status_operacional":
+            conduta_normalizada,
+
+        "risco": None,
+        "procedimento": "DNA-HPV",
+        "solicitante": None,
+
+        "data_coleta": None,
+        "data_recebimento_laboratorio": None,
+
+        # No DNA-HPV, a data de liberação será
+        # utilizada como data de realização.
+        "data_entrega_resultado":
+            data_liberacao,
+
+        "exame": "DNA-HPV",
+
+        "alterado":
+            resultado_normalizado not in (
+                "negativo",
+                "incompleto",
+            ),
+
+        "alerta":
+            resultado_normalizado in (
+                "hpv16",
+                "hpv18",
+                "hpv16_alto_risco",
+                "alto_risco",
+            ),
+
+        "data_nascimento_origem": None,
+        "sexo_origem": None,
+
+        "resultado_original":
+            resultado_original or None,
+
+        "resultado_normalizado":
+            resultado_normalizado,
+
+        "genotipo_hpv":
+            genotipo_hpv,
+
+        "conduta_original":
+            conduta_original or None,
+
+        "conduta_normalizada":
+            conduta_normalizada,
+
+        "atualizado_em":
+            agora_iso(),
+    }
 
 # ============================================================
 # CONEXÃO REST COM SUPABASE
@@ -990,7 +1164,16 @@ def main():
 
             for registro in registros:
                 try:
-                    if programa in (
+                    if programa == "dna_hpv":
+                        item = (
+                            processar_dna_hpv(
+                                registro,
+                                programa,
+                                nome_aba,
+                            )
+                        )
+
+                    elif programa in (
                         "mamografia",
                         "colonoscopia",
                     ):
@@ -1000,7 +1183,7 @@ def main():
                                 programa,
                                 nome_aba,
                             )
-                        )
+                        )           
 
                     else:
                         item = (
@@ -1088,6 +1271,18 @@ def main():
         total_processados = len(
             todos_unicos
         )
+
+        # ====================================================
+        # TESTE TEMPORÁRIO DNA-HPV
+        # Para após gravar no staging.
+        # ====================================================
+        print()
+        print("STAGING ATUALIZADO.")
+        print(
+            "TESTE DNA-HPV: integração com rastreamentos "
+            "temporariamente pausada."
+        )
+        return
 
         print()
         print(
