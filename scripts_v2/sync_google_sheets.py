@@ -882,6 +882,12 @@ def enviar_lote_supabase(
         timeout=120,
     )
 
+if not resposta.ok:
+    print()
+    print("ERRO DETALHADO DO SUPABASE:")
+    print(resposta.status_code)
+    print(resposta.text)
+    print()
     resposta.raise_for_status()
 
 def enviar_inconsistencias(
