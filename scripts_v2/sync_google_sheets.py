@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import json
 import os
 import re
@@ -18,7 +18,7 @@ ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(ENV_FILE)
 
 # ============================================================
-# CONFIGURAÇÕES
+# CONFIGURAÃ‡Ã•ES
 # ============================================================
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -29,7 +29,7 @@ SUPABASE_KEY = (
 
 if not SUPABASE_KEY:
     raise RuntimeError(
-        "Chave administrativa do Supabase não encontrada."
+        "Chave administrativa do Supabase nÃ£o encontrada."
     )
 
 SUPABASE_REST_URL = (
@@ -47,7 +47,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.environ[
 ABAS = {
     "Mamografia Bilateral": "mamografia",
     "Colonoscopia": "colonoscopia",
-    "Citopatológico (PAP)": "citopatologico",
+    "CitopatolÃ³gico (PAP)": "citopatologico",
     "Sangue Oculto nas Fezes (SO)": "sangue_oculto",
     "DNA-HPV": "dna_hpv",
 }
@@ -57,7 +57,7 @@ BATCH_SIZE = 100
 
 
 # ============================================================
-# FUNÇÕES BÁSICAS
+# FUNÃ‡Ã•ES BÃSICAS
 # ============================================================
 
 def agora_iso():
@@ -133,7 +133,7 @@ def chave_hash(*valores):
 
 
 # ============================================================
-# CLASSIFICAÇÃO DOS STATUS
+# CLASSIFICAÃ‡ÃƒO DOS STATUS
 # ============================================================
 
 def status_agendamento(situacao):
@@ -151,7 +151,7 @@ def status_agendamento(situacao):
         return "Agendado"
 
     if "pendente regulacao" in situacao_norm:
-        return "Pendente regulação"
+        return "Pendente regulaÃ§Ã£o"
 
     if "cancelad" in situacao_norm:
         return "Cancelado"
@@ -166,9 +166,9 @@ def status_agendamento(situacao):
         return "Negado"
 
     if "obito" in situacao_norm:
-        return "Óbito"
+        return "Ã“bito"
 
-    return "Não classificado"
+    return "NÃ£o classificado"
 
 
 def status_laboratorio(
@@ -182,16 +182,16 @@ def status_laboratorio(
         return "Resultado entregue"
 
     # Recebido:
-    # laboratório recebeu o exame.
+    # laboratÃ³rio recebeu o exame.
     if limpar(recebido):
         return "Em processamento"
 
     # Entrada:
     # exame coletado/entregue pela unidade.
     if limpar(entrada):
-        return "Coletado - aguardando laboratório"
+        return "Coletado - aguardando laboratÃ³rio"
 
-    return "Sem movimentação"
+    return "Sem movimentaÃ§Ã£o"
 
 
 def eh_alterado(
@@ -225,7 +225,7 @@ def eh_alerta(valor):
         valor
     )
 
-    return "🔴" in valor
+    return "ðŸ”´" in valor
 
 
 # ============================================================
@@ -280,7 +280,7 @@ def processar_agendamento(
 ):
     codigo = limpar(
         registro.get(
-            "Código de solicitação"
+            "CÃ³digo de solicitaÃ§Ã£o"
         )
     )
 
@@ -290,7 +290,7 @@ def processar_agendamento(
 
     data_solicitacao = parse_data(
         registro.get(
-            "Data de solicitação"
+            "Data de solicitaÃ§Ã£o"
         )
     )
 
@@ -315,7 +315,7 @@ def processar_agendamento(
 
     situacao = limpar(
         registro.get(
-            "Situação"
+            "SituaÃ§Ã£o"
         )
     )
 
@@ -407,7 +407,7 @@ def processar_agendamento(
 
 
 # ============================================================
-# CITOPATOLÓGICO / SANGUE OCULTO
+# CITOPATOLÃ“GICO / SANGUE OCULTO
 # ============================================================
 
 def processar_laboratorio(
@@ -421,7 +421,7 @@ def processar_laboratorio(
 
     solicitacao = limpar(
         registro.get(
-            "Solicitação"
+            "SolicitaÃ§Ã£o"
         )
     )
 
@@ -515,7 +515,7 @@ def processar_laboratorio(
             ),
 
         # Recebido =
-        # laboratório recebeu o exame.
+        # laboratÃ³rio recebeu o exame.
         "data_recebimento_laboratorio":
             parse_data(
                 recebido
@@ -586,15 +586,15 @@ def processar_dna_hpv(registro, programa, nome_aba):
     )
 
     situacao_original = limpar(
-        registro.get("Situação")
+        registro.get("SituaÃ§Ã£o")
     )
 
     data_liberacao = parse_data(
-        registro.get("Data de liberação")
+        registro.get("Data de liberaÃ§Ã£o")
     )
 
     # --------------------------------------------------------
-    # NORMALIZAÇÃO DO RESULTADO DNA-HPV
+    # NORMALIZAÃ‡ÃƒO DO RESULTADO DNA-HPV
     # --------------------------------------------------------
     resultado_limpo = sem_acentos(
         resultado_original
@@ -635,7 +635,7 @@ def processar_dna_hpv(registro, programa, nome_aba):
         genotipo_hpv = None
 
     # --------------------------------------------------------
-    # NORMALIZAÇÃO DA CONDUTA
+    # NORMALIZAÃ‡ÃƒO DA CONDUTA
     # --------------------------------------------------------
     conduta_limpa = sem_acentos(
         conduta_original
@@ -660,7 +660,7 @@ def processar_dna_hpv(registro, programa, nome_aba):
         conduta_normalizada = "nao_classificada"
 
     # --------------------------------------------------------
-    # CHAVE ÚNICA DA ORIGEM
+    # CHAVE ÃšNICA DA ORIGEM
     # --------------------------------------------------------
     chave = chave_hash(
         programa,
@@ -695,8 +695,8 @@ def processar_dna_hpv(registro, programa, nome_aba):
         "data_coleta": None,
         "data_recebimento_laboratorio": None,
 
-        # No DNA-HPV, a data de liberação será
-        # utilizada como data de realização.
+        # No DNA-HPV, a data de liberaÃ§Ã£o serÃ¡
+        # utilizada como data de realizaÃ§Ã£o.
         "data_entrega_resultado":
             data_liberacao,
 
@@ -739,7 +739,7 @@ def processar_dna_hpv(registro, programa, nome_aba):
     }
 
 # ============================================================
-# CONEXÃO REST COM SUPABASE
+# CONEXÃƒO REST COM SUPABASE
 # ============================================================
 
 def criar_sessao_supabase():
@@ -789,7 +789,7 @@ def criar_sessao_supabase():
 
 
 # ============================================================
-# HISTÓRICO DE CARGAS
+# HISTÃ“RICO DE CARGAS
 # ============================================================
 
 def inserir_historico(
@@ -882,13 +882,13 @@ def enviar_lote_supabase(
         timeout=120,
     )
 
-if not resposta.ok:
-    print()
-    print("ERRO DETALHADO DO SUPABASE:")
-    print(resposta.status_code)
-    print(resposta.text)
-    print()
-    resposta.raise_for_status()
+    if not resposta.ok:
+        print()
+        print("ERRO DETALHADO DO SUPABASE:")
+        print(resposta.status_code)
+        print(resposta.text)
+        print()
+        resposta.raise_for_status()
 
 def enviar_inconsistencias(
     sessao,
@@ -925,7 +925,7 @@ def enviar_inconsistencias(
         resposta.raise_for_status()
 
     print(
-        f"Inconsistências cadastrais registradas: {total}"
+        f"InconsistÃªncias cadastrais registradas: {total}"
     )
 
 
@@ -1061,8 +1061,8 @@ def remover_duplicados(
             item["chave_origem"],
         )
 
-        # Em caso de repetição,
-        # mantém a última ocorrência.
+        # Em caso de repetiÃ§Ã£o,
+        # mantÃ©m a Ãºltima ocorrÃªncia.
         unicos[chave] = item
 
     return list(
@@ -1076,7 +1076,7 @@ def remover_duplicados(
 
 def main():
     print(
-        "INICIANDO SINCRONIZAÇÃO GOOGLE SHEETS"
+        "INICIANDO SINCRONIZAÃ‡ÃƒO GOOGLE SHEETS"
     )
 
     sessao = criar_sessao_supabase()
@@ -1200,8 +1200,8 @@ def main():
                             )
                         )
 
-                    # Registros sem CNS ou com CNS fora do padrão
-                    # não entram na base nominal, mas passam a ser
+                    # Registros sem CNS ou com CNS fora do padrÃ£o
+                    # nÃ£o entram na base nominal, mas passam a ser
                     # registrados para tratamento administrativo.
                     cns_item = item.get("cns") or ""
 
@@ -1217,7 +1217,7 @@ def main():
                             "unidade": item.get("unidade"),
                             "data_nascimento_origem": item.get("data_nascimento_origem"),
                             "sexo_origem": item.get("sexo_origem"),
-                            "motivo": "CNS ausente ou inválido",
+                            "motivo": "CNS ausente ou invÃ¡lido",
                             "atualizado_em": agora_iso(),
                         })
                         continue
@@ -1238,7 +1238,7 @@ def main():
 
         print()
         print(
-            f"Registros válidos: "
+            f"Registros vÃ¡lidos: "
             f"{len(todos)}"
         )
 
@@ -1279,13 +1279,13 @@ def main():
         )
 
         # ====================================================
-        # TESTE TEMPORÁRIO DNA-HPV
-        # Para após gravar no staging.
+        # TESTE TEMPORÃRIO DNA-HPV
+        # Para apÃ³s gravar no staging.
         # ====================================================
         print()
         print("STAGING ATUALIZADO.")
         print(
-            "TESTE DNA-HPV: integração com rastreamentos "
+            "TESTE DNA-HPV: integraÃ§Ã£o com rastreamentos "
             "temporariamente pausada."
         )
         return
@@ -1326,10 +1326,10 @@ def main():
                     "sucesso",
 
                 "mensagem": (
-                    "Sincronização Google Sheets concluída. "
+                    "SincronizaÃ§Ã£o Google Sheets concluÃ­da. "
                     f"Duplicidades internas: {total_duplicados}. "
-                    f"Inconsistências sem CNS válido: {len(rejeitados)}. "
-                    f"Integração: {json.dumps(resultado_integracao, ensure_ascii=False)}"
+                    f"InconsistÃªncias sem CNS vÃ¡lido: {len(rejeitados)}. "
+                    f"IntegraÃ§Ã£o: {json.dumps(resultado_integracao, ensure_ascii=False)}"
                 ),
             },
         )
@@ -1340,7 +1340,7 @@ def main():
         )
 
         print(
-            "SINCRONIZAÇÃO CONCLUÍDA"
+            "SINCRONIZAÃ‡ÃƒO CONCLUÃDA"
         )
 
         print(
@@ -1349,7 +1349,7 @@ def main():
         )
 
         print(
-            f"Válidos: "
+            f"VÃ¡lidos: "
             f"{total_validos}"
         )
 
@@ -1369,7 +1369,7 @@ def main():
         )
 
         print(
-            f"Inconsistências cadastrais: "
+            f"InconsistÃªncias cadastrais: "
             f"{len(rejeitados)}"
         )
 
@@ -1380,7 +1380,7 @@ def main():
     except Exception as erro:
         print()
         print(
-            f"ERRO NA SINCRONIZAÇÃO: "
+            f"ERRO NA SINCRONIZAÃ‡ÃƒO: "
             f"{erro}"
         )
 
@@ -1411,8 +1411,8 @@ def main():
 
         except Exception as erro_historico:
             print(
-                "Também ocorreu erro ao "
-                "atualizar o histórico: "
+                "TambÃ©m ocorreu erro ao "
+                "atualizar o histÃ³rico: "
                 f"{erro_historico}"
             )
 
