@@ -47,7 +47,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.environ[
 ABAS = {
     "Mamografia Bilateral": "mamografia",
     "Colonoscopia": "colonoscopia",
-    "CitopatolÃ³gico (PAP)": "citopatologico",
+    "Citopatológico (PAP)": "citopatologico",
     "Sangue Oculto nas Fezes (SO)": "sangue_oculto",
     "DNA-HPV": "dna_hpv",
 }
@@ -151,7 +151,7 @@ def status_agendamento(situacao):
         return "Agendado"
 
     if "pendente regulacao" in situacao_norm:
-        return "Pendente regulaÃ§Ã£o"
+        return "Pendente regulação"
 
     if "cancelad" in situacao_norm:
         return "Cancelado"
@@ -166,9 +166,9 @@ def status_agendamento(situacao):
         return "Negado"
 
     if "obito" in situacao_norm:
-        return "Ã“bito"
+        return "Óbito"
 
-    return "NÃ£o classificado"
+    return "Não classificado"
 
 
 def status_laboratorio(
@@ -189,9 +189,9 @@ def status_laboratorio(
     # Entrada:
     # exame coletado/entregue pela unidade.
     if limpar(entrada):
-        return "Coletado - aguardando laboratÃ³rio"
+        return "Coletado - aguardando laboratório"
 
-    return "Sem movimentaÃ§Ã£o"
+    return "Sem movimentação"
 
 
 def eh_alterado(
@@ -280,7 +280,7 @@ def processar_agendamento(
 ):
     codigo = limpar(
         registro.get(
-            "CÃ³digo de solicitaÃ§Ã£o"
+            "Código de solicitação"
         )
     )
 
@@ -290,7 +290,7 @@ def processar_agendamento(
 
     data_solicitacao = parse_data(
         registro.get(
-            "Data de solicitaÃ§Ã£o"
+            "Data de solicitação"
         )
     )
 
@@ -315,7 +315,7 @@ def processar_agendamento(
 
     situacao = limpar(
         registro.get(
-            "SituaÃ§Ã£o"
+            "Situação"
         )
     )
 
@@ -421,7 +421,7 @@ def processar_laboratorio(
 
     solicitacao = limpar(
         registro.get(
-            "SolicitaÃ§Ã£o"
+            "Solicitação"
         )
     )
 
@@ -586,11 +586,11 @@ def processar_dna_hpv(registro, programa, nome_aba):
     )
 
     situacao_original = limpar(
-        registro.get("SituaÃ§Ã£o")
+        registro.get("Situação")
     )
 
     data_liberacao = parse_data(
-        registro.get("Data de liberaÃ§Ã£o")
+        registro.get("Data de liberação")
     )
 
     # --------------------------------------------------------
