@@ -862,6 +862,22 @@ def enviar_lote_supabase(
     sessao,
     lote,
 ):
+
+    # Garante que todos os objetos do lote tenham
+    # exatamente o mesmo conjunto de colunas.
+    todas_chaves = set()
+
+    for item in lote:
+        todas_chaves.update(item.keys())
+
+    lote = [
+        {
+            chave: item.get(chave)
+            for chave in todas_chaves
+        }
+        for item in lote
+    ]
+    
     url = (
         f"{SUPABASE_REST_URL}"
         "/staging_google_sheets"
