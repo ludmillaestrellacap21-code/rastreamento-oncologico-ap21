@@ -961,12 +961,13 @@ with st.sidebar:
     )
 
     paginas = [
-        ("🏠", "Visão Geral"),
-        ("🎗️", "Mamografia"),
-        ("◉", "Colo do Útero"),
-        ("▣", "Colorretal"),
-        ("⌕", "Busca Ativa"),
-    ]
+    ("🏠", "Visão Geral"),
+    ("🎗️", "Mamografia"),
+    ("◉", "Colo do Útero"),
+    ("🧬", "DNA-HPV"),
+    ("▣", "Colorretal"),
+    ("⌕", "Busca Ativa"),
+]
 
     if PERFIL_USUARIO == "admin":
         paginas.append(("⚙️", "Administração"))
@@ -2332,6 +2333,63 @@ elif pagina == "Colo do Útero":
         programa
     )
 
+# =========================================================
+# DNA-HPV
+# =========================================================
+
+elif pagina == "DNA-HPV":
+
+    programa = "dna_hpv"
+
+    st.info(
+        "DNA-HPV: rastreamento da população feminina de 25 a 64 anos. "
+        "Resultados negativos permanecem em dia. "
+        "Resultados que necessitam acompanhamento são classificados "
+        "como Seguimento, preservando a conduta registrada."
+    )
+
+    resumo = get_resumo(
+        u, e, m,
+        programa,
+        s, fl
+    )
+
+    cards(resumo)
+
+    left, right = st.columns(2)
+
+    with left:
+        status_chart(
+            get_status(
+                u, e, m,
+                programa
+            ),
+            "Situação — DNA-HPV"
+        )
+
+    with right:
+        fluxo_chart(
+            get_fluxo(
+                u, e, m,
+                programa
+            ),
+            "Conduta — DNA-HPV"
+        )
+
+    unidade_chart(
+        get_unidades(
+            programa,
+            s,
+            fl,
+            u
+        ),
+        "DNA-HPV por unidade"
+    )
+
+    busca_ativa(
+        "dna_hpv",
+        programa
+    )
 
 # =========================================================
 # COLORRETAL
