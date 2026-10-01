@@ -338,18 +338,25 @@ st.markdown(
     background: #FFFFFF;
     border: 1px solid #DCE5EC;
     border-radius: 10px;
-    padding: 10px 13px;
-    min-height: 70px;
+    padding: 11px 13px;
+    height: 82px;
+    min-height: 82px;
+    box-sizing: border-box;
     box-shadow: 0 1px 3px rgba(23,54,93,.025);
     margin-bottom: 2px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }}
 
 .metric-card-top {{
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 7px;
+    min-height: 20px;
+    margin-bottom: 5px;
 }}
 
 .metric-label {{
@@ -381,6 +388,8 @@ st.markdown(
     font-weight: 800;
     white-space: nowrap;
     border: 1px solid transparent;
+    flex: 0 0 auto;
+    margin-left: auto;
 }}
 
 
@@ -470,11 +479,19 @@ st.markdown(
        ===================================================== */
 
     [data-testid="stPlotlyChart"] {{
-        background: white;
+        background: #FFFFFF;
         border: 1px solid #E1E7ED;
         border-radius: 12px;
-        padding: 6px;
+        padding: 8px;
         box-shadow: 0 2px 7px rgba(22,47,75,.025);
+        box-sizing: border-box;
+        width: 100%;
+        overflow: hidden;
+    }}
+
+    /* Padroniza o espaço ocupado pelos gráficos lado a lado */
+    [data-testid="stPlotlyChart"] > div {{
+        width: 100% !important;
     }}
 
     [data-testid="stDataFrame"] {{
@@ -1297,9 +1314,9 @@ def status_chart(rows, titulo):
             font=dict(size=15),
             x=0.02,
         ),
-        height=330,
+        height=350,
         showlegend=False,
-        margin=dict(l=15, r=15, t=55, b=20),
+        margin=dict(l=20, r=30, t=60, b=35),
         paper_bgcolor="white",
         plot_bgcolor="white",
         xaxis_title="",
@@ -1392,8 +1409,14 @@ def unidade_chart(rows, titulo):
     fig = px.bar(df, x="total", y="unidade", orientation="h", text="total",
                  title=titulo, color_discrete_sequence=[RIO_BLUE])
     fig.update_traces(textposition="outside")
-    fig.update_layout(margin=dict(l=10,r=20,t=55,b=10), paper_bgcolor="white",
-                      plot_bgcolor="white", xaxis_title="Total", yaxis_title="")
+    fig.update_layout(
+        height=420,
+        margin=dict(l=20, r=30, t=60, b=35),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        xaxis_title="Total",
+        yaxis_title=""
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
