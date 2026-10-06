@@ -12,6 +12,7 @@ from supabase import create_client
 # CONFIGURAÇÃO
 # =========================================================
 ROOT = Path(__file__).resolve().parents[1]
+LACO_ROSA = ROOT / "assets" / "laco_rosa.png"
 load_dotenv(ROOT / ".env")
 
 
@@ -34,7 +35,6 @@ APP_URL_CONFIG = get_setting(
 
 st.set_page_config(
     page_title="Rastreamento Oncológico | CAP 2.1",
-    page_icon="🎗️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -58,7 +58,7 @@ STATUS_COLORS = {
     "Em atraso": "#D65A5A",
 
     # ausência de informação — propositalmente discreto
-    "Sem registro de realização": "#A7B4C0",
+    "Sem registro de realização": "#7A5C99",
 
     # acompanhamento
     "Seguimento": "#4E7FA8",
@@ -424,6 +424,34 @@ st.markdown(
     border-color: #D4E4F1;
 }}
 
+/* =====================================================
+   PRIORIDADES — BUSCA ATIVA
+   ===================================================== */
+
+.priority-p1 {{
+    border-left: 5px solid #C62828 !important;
+    background: #FFF5F5 !important;
+}}
+
+.priority-p2 {{
+    border-left: 5px solid #E76F00 !important;
+    background: #FFF7ED !important;
+}}
+
+.priority-p3 {{
+    border-left: 5px solid #D6A21F !important;
+    background: #FFFBEA !important;
+}}
+
+.priority-p4 {{
+    border-left: 5px solid #357ABD !important;
+    background: #F1F7FC !important;
+}}
+
+.priority-p5 {{
+    border-left: 5px solid #7A5C99 !important;
+    background: #F7F3FA !important;
+}}
 
 /* Prioridade */
 .metric-badge.danger {{
@@ -954,6 +982,21 @@ def get_indicadores(programa, unidade, equipe, microarea):
     return data or {}
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def get_equipes(unidade, microarea, programa, status, fluxo):
+    return rpc(
+        "dashboard2_equipes",
+        {
+            "p_unidade": unidade,
+            "p_microarea": microarea,
+            "p_programa": programa,
+            "p_status": status,
+            "p_fluxo": fluxo,
+        },
+        stop_on_error=False,
+    ) or []
+
+
 # =========================================================
 # SIDEBAR
 # =========================================================
@@ -978,13 +1021,13 @@ with st.sidebar:
     )
 
     paginas = [
-    ("🏠", "Visão Geral"),
-    ("🎗️", "Mamografia"),
-    ("◉", "Colo do Útero"),
-    ("🧬", "DNA-HPV"),
-    ("▣", "Colorretal"),
-    ("⌕", "Busca Ativa"),
-]
+        ("🏠", "Visão Geral"),
+        ("", "Mamografia"),
+        ("◉", "Colo do Útero"),
+        ("🧬", "DNA-HPV"),
+        ("▣", "Colorretal"),
+        ("⌕", "Busca Ativa"),
+    ]
 
     if PERFIL_USUARIO == "admin":
         paginas.append(("⚙️", "Administração"))
@@ -992,14 +1035,26 @@ with st.sidebar:
     for icone, nome in paginas:
         tipo = "primary" if st.session_state.pagina_atual == nome else "secondary"
 
-        if st.button(
-            f"{icone}  {nome}",
-            key=f"nav_{nome}",
-            use_container_width=True,
-            type=tipo,
-        ):
-            st.session_state.pagina_atual = nome
-            st.rerun()
+        # Mamografia usa o laço rosa personalizado
+        if nome == "Mamografia":
+            if st.button(
+                "Mamografia",
+                key=f"nav_{nome}",
+                use_container_width=True,
+                type=tipo,
+            ):
+                st.session_state.pagina_atual = nome
+                st.rerun()
+
+        else:
+            if st.button(
+                f"{icone}  {nome}",
+                key=f"nav_{nome}",
+                use_container_width=True,
+                type=tipo,
+            ):
+                st.session_state.pagina_atual = nome
+                st.rerun()
 
     st.markdown("---")
 
@@ -1400,6 +1455,189 @@ def fluxo_chart(rows, titulo):
         config={"displayModeBar": False},
     )
 
+def equipe_media_chart(rows, titulo="Busca ativa por equipe"):
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        st.info("Sem dados de busca ativa por equipe para os filtros selecionados.")
+        return
+
+    df["total_busca_ativa"] = pd.to_numeric(
+        df["total_busca_ativa"],
+        errors="coerce"
+    ).fillna(0)
+
+    df["total_elegiveis"] = pd.to_numeric(
+        df["total_elegiveis"],
+        errors="coerce"
+    ).fillna(0)
+
+    resumo = (
+        df.groupby("equipe", as_index=False)
+        .agg(
+            total_busca_ativa=("total_busca_ativa", "sum"),
+            total_elegiveis=("total_elegiveis", "max"),
+        )
+    )
+
+    resumo["percentual_busca_ativa"] = (
+        resumo["total_busca_ativa"]
+        / resumo["total_elegiveis"].replace(0, pd.NA)
+        * 100
+    ).fillna(0)
+
+    total_busca = resumo["total_busca_ativa"].sum()
+    total_elegiveis = resumo["total_elegiveis"].sum()
+
+    taxa_geral = (
+        total_busca / total_elegiveis
+        if total_elegiveis > 0
+        else 0
+    )
+
+    resumo["referencia_ajustada"] = (
+        resumo["total_elegiveis"] * taxa_geral
+    )
+
+    resumo["diferenca_referencia"] = (
+        resumo["total_busca_ativa"]
+        - resumo["referencia_ajustada"]
+    )
+
+    resumo["situacao_referencia"] = resumo["diferenca_referencia"].apply(
+        lambda x: "Acima da referência" if x > 0 else "Abaixo da referência"
+    )
+
+    df = df.merge(
+        resumo[
+            [
+                "equipe",
+                "total_busca_ativa",
+                "percentual_busca_ativa",
+                "referencia_ajustada",
+            ]
+        ].rename(
+            columns={
+                "total_busca_ativa": "total_equipe"
+            }
+        ),
+        on="equipe",
+        how="left",
+    )
+
+    ordem_equipes = (
+        resumo
+        .sort_values("total_busca_ativa", ascending=True)["equipe"]
+        .tolist()
+    )
+
+    fig = px.bar(
+        df,
+        x="total_busca_ativa",
+        y="equipe",
+        color="status_rastreamento",
+        orientation="h",
+        text="total_busca_ativa",
+        title=titulo,
+        color_discrete_map=STATUS_COLORS,
+        category_orders={
+            "equipe": ordem_equipes,
+            "status_rastreamento": [
+                "Em atraso",
+                "Vence em até 90 dias",
+                "Sem registro de realização",
+            ],
+        },
+        custom_data=[
+            "total_equipe",
+            "total_elegiveis",
+            "percentual_busca_ativa",
+            "referencia_ajustada",
+        ],
+    )
+
+    fig.update_traces(
+        textposition="inside",
+        marker_line_width=0,
+        textfont_size=10,
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Situação: %{fullData.name}<br>"
+            "Quantidade: %{x:.0f}<br>"
+            "Busca ativa total: %{customdata[0]:.0f}<br>"
+            "Elegíveis: %{customdata[1]:.0f}<br>"
+            "Busca ativa: %{customdata[2]:.1f}%<br>"
+            "Referência ajustada: %{customdata[3]:.0f}"
+            "<extra></extra>"
+        ),
+    )
+
+    resumo_plot = (
+        resumo
+        .set_index("equipe")
+        .loc[ordem_equipes]
+        .reset_index()
+    )
+
+    fig.add_scatter(
+        x=resumo_plot["referencia_ajustada"],
+        y=resumo_plot["equipe"],
+        mode="markers",
+        name="Referência ajustada",
+        marker=dict(
+            symbol="diamond",
+            size=11,
+            color="#17365D",
+            line=dict(
+                width=1,
+                color="white",
+            ),
+        ),
+        customdata=resumo_plot[
+            [
+                "total_elegiveis",
+                "percentual_busca_ativa",
+                "diferenca_referencia",
+                "situacao_referencia",
+            ]
+        ].values,
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Referência ajustada: %{x:.0f}<br>"
+            "Elegíveis: %{customdata[0]:.0f}<br>"
+            "Busca ativa atual: %{customdata[1]:.1f}%<br>"
+            "Diferença: %{customdata[2]:+.0f}<br>"
+            "<b>%{customdata[3]}</b>"
+            "<extra></extra>"
+        ),
+    )
+
+    fig.update_layout(
+        barmode="stack",
+        height=max(450, len(ordem_equipes) * 34),
+        margin=dict(l=20, r=70, t=70, b=40),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        xaxis_title="Pessoas em busca ativa",
+        yaxis_title="",
+        legend_title_text="Situação",
+    )
+
+    fig.update_xaxes(
+        gridcolor="#EEF2F6",
+        zeroline=False,
+    )
+
+    fig.update_yaxes(
+        showgrid=False,
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displayModeBar": False},
+    )
+
 def unidade_chart(rows, titulo):
     df = pd.DataFrame(rows)
     if df.empty:
@@ -1418,7 +1656,6 @@ def unidade_chart(rows, titulo):
         yaxis_title=""
     )
     st.plotly_chart(fig, use_container_width=True)
-
 
 def atualizacoes_visao_geral():
     dados = get_atualizacoes()
@@ -1473,7 +1710,6 @@ def indicadores_operacionais(programa):
         c4.metric("Resultados alterados", fmt(dados.get("alterados")))
         media = dados.get("media_dias_coleta_resultado")
         c5.metric("Média coleta → resultado", f"{media or 0} dias")
-
 
 def busca_ativa(chave, programa_forcado=None):
     st.markdown(
@@ -1537,7 +1773,7 @@ def busca_ativa(chave, programa_forcado=None):
     with p1:
         st.markdown(
             """
-            <div class="metric-card danger">
+            <div class="metric-card priority-p1">
                 <div class="metric-label">
                     PRIORIDADE 1
                 </div>
@@ -1556,7 +1792,7 @@ def busca_ativa(chave, programa_forcado=None):
     with p2:
         st.markdown(
             """
-            <div class="metric-card danger">
+            <div class="metric-card priority-p2">
                 <div class="metric-label">
                     PRIORIDADE 2
                 </div>
@@ -1575,7 +1811,7 @@ def busca_ativa(chave, programa_forcado=None):
     with p3:
         st.markdown(
             """
-            <div class="metric-card warning">
+            <div class="metric-card priority-p3">
                 <div class="metric-label">
                     PRIORIDADE 3
                 </div>
@@ -1594,7 +1830,7 @@ def busca_ativa(chave, programa_forcado=None):
     with p4:
         st.markdown(
             """
-            <div class="metric-card success">
+            <div class="metric-card priority-p4">
                 <div class="metric-label">
                     PRIORIDADE 4
                 </div>
@@ -1613,7 +1849,7 @@ def busca_ativa(chave, programa_forcado=None):
     with p5:
         st.markdown(
             """
-            <div class="metric-card neutral">
+            <div class="metric-card priority-p5">
                 <div class="metric-label">
                     PRIORIDADE 5
                 </div>
@@ -1801,115 +2037,145 @@ def busca_ativa(chave, programa_forcado=None):
     # =====================================================
 
     rename = {
-    "prioridade": "Prioridade",
-    "nome": "Nome",
-    "cns": "CNS",
-    "idade": "Idade",
-    "unidade": "Unidade",
-    "equipe": "Equipe",
-    "programa": "Programa",
-    "status_rastreamento": "Situação temporal",
-    "status_fluxo": "Fluxo operacional",
-    "dias_para_vencer": "Dias para vencer",
-    "data_proxima_referencia": "Próxima referência",
-    "microarea": "Microárea",
-    "data_ultima_realizacao": "Última realização",
-    "data_agendamento": "Agendamento",
-    "data_solicitacao": "Solicitação",
-    "risco": "Risco",
-}
+        "prioridade": "Prioridade",
+        "nome": "Nome",
+        "cns": "CNS",
+        "idade": "Idade",
+        "unidade": "Unidade",
+        "equipe": "Equipe",
+        "programa": "Programa",
+        "status_rastreamento": "Situação temporal",
+        "status_fluxo": "Fluxo operacional",
+        "dias_para_vencer": "Dias para vencer",
+        "data_proxima_referencia": "Próxima referência",
+        "microarea": "Microárea",
+        "data_ultima_realizacao": "Última realização",
+        "data_agendamento": "Agendamento",
+        "data_solicitacao": "Solicitação",
+        "risco": "Risco",
+    }
 
     cols = [
-    c
-    for c in [
-        "prioridade",
-        "nome",
-        "cns",
-        "idade",
-        "unidade",
-        "equipe",
-        "programa",
-        "status_rastreamento",
-        "status_fluxo",
-        "dias_para_vencer",
-        "data_proxima_referencia",
-        "microarea",
-        "data_ultima_realizacao",
-        "data_agendamento",
-        "data_solicitacao",
-        "risco",
+        c
+        for c in [
+            "prioridade",
+            "nome",
+            "cns",
+            "idade",
+            "unidade",
+            "equipe",
+            "programa",
+            "status_rastreamento",
+            "status_fluxo",
+            "dias_para_vencer",
+            "data_proxima_referencia",
+            "microarea",
+            "data_ultima_realizacao",
+            "data_agendamento",
+            "data_solicitacao",
+            "risco",
+        ]
+        if c in df.columns
     ]
-    if c in df.columns
-]
+
+    # =====================================================
+    # PRIORIDADE — IDENTIFICAÇÃO VISUAL
+    # =====================================================
+
+    def prioridade_visual(valor):
+        if pd.isna(valor):
+            return valor
+
+        texto = str(valor)
+
+        if "Prioridade 1" in texto:
+            return "🔴 P1 — Em atraso"
+
+        if "Prioridade 2" in texto:
+            return "🟠 P2 — Até 30 dias"
+
+        if "Prioridade 3" in texto:
+            return "🟡 P3 — 31–60 dias"
+
+        if "Prioridade 4" in texto:
+            return "🔵 P4 — 61–90 dias"
+
+        if "Prioridade 5" in texto:
+            return "🟣 P5 — Sem registro"
+
+        return texto
+
+    if "prioridade" in df.columns:
+        df["prioridade"] = df["prioridade"].apply(prioridade_visual)
 
     st.dataframe(
-    df[cols].rename(columns=rename),
-    use_container_width=True,
-    hide_index=True,
-    height=560,
-    column_config={
-        "Prioridade": st.column_config.TextColumn(
-            "Prioridade",
-            width="medium",
-        ),
-        "Nome": st.column_config.TextColumn(
-            "Nome",
-            width="large",
-        ),
-        "CNS": st.column_config.TextColumn(
-            "CNS",
-            width="medium",
-        ),
-        "Idade": st.column_config.NumberColumn(
-            "Idade",
-            width="small",
-        ),
-        "Unidade": st.column_config.TextColumn(
-            "Unidade",
-            width="large",
-        ),
-        "Equipe": st.column_config.TextColumn(
-            "Equipe",
-            width="medium",
-        ),
-        "Programa": st.column_config.TextColumn(
-            "Programa",
-            width="medium",
-        ),
-        "Situação temporal": st.column_config.TextColumn(
-            "Situação temporal",
-            width="medium",
-        ),
-        "Fluxo operacional": st.column_config.TextColumn(
-            "Fluxo operacional",
-            width="medium",
-        ),
-        "Dias para vencer": st.column_config.NumberColumn(
-            "Dias para vencer",
-            width="small",
-        ),
-        "Próxima referência": st.column_config.DateColumn(
-            "Próxima referência",
-            format="DD/MM/YYYY",
-            width="medium",
-        ),
-        "Última realização": st.column_config.DateColumn(
-            "Última realização",
-            format="DD/MM/YYYY",
-            width="medium",
-        ),
-        "Agendamento": st.column_config.DateColumn(
-            "Agendamento",
-            format="DD/MM/YYYY",
-            width="medium",
-        ),
-        "Solicitação": st.column_config.DateColumn(
-            "Solicitação",
-            format="DD/MM/YYYY",
-            width="medium",
-        ),
-    },
-)
+        df[cols].rename(columns=rename),
+        use_container_width=True,
+        hide_index=True,
+        height=560,
+        column_config={
+            "Prioridade": st.column_config.TextColumn(
+                "Prioridade",
+                width="medium",
+            ),
+            "Nome": st.column_config.TextColumn(
+                "Nome",
+                width="large",
+            ),
+            "CNS": st.column_config.TextColumn(
+                "CNS",
+                width="medium",
+            ),
+            "Idade": st.column_config.NumberColumn(
+                "Idade",
+                width="small",
+            ),
+            "Unidade": st.column_config.TextColumn(
+                "Unidade",
+                width="large",
+            ),
+            "Equipe": st.column_config.TextColumn(
+                "Equipe",
+                width="medium",
+            ),
+            "Programa": st.column_config.TextColumn(
+                "Programa",
+                width="medium",
+            ),
+            "Situação temporal": st.column_config.TextColumn(
+                "Situação temporal",
+                width="medium",
+            ),
+            "Fluxo operacional": st.column_config.TextColumn(
+                "Fluxo operacional",
+                width="medium",
+            ),
+            "Dias para vencer": st.column_config.NumberColumn(
+                "Dias para vencer",
+                width="small",
+            ),
+            "Próxima referência": st.column_config.DateColumn(
+                "Próxima referência",
+                format="DD/MM/YYYY",
+                width="medium",
+            ),
+            "Última realização": st.column_config.DateColumn(
+                "Última realização",
+                format="DD/MM/YYYY",
+                width="medium",
+            ),
+            "Agendamento": st.column_config.DateColumn(
+                "Agendamento",
+                format="DD/MM/YYYY",
+                width="medium",
+            ),
+            "Solicitação": st.column_config.DateColumn(
+                "Solicitação",
+                format="DD/MM/YYYY",
+                width="medium",
+            ),
+        },
+    )
 
 def pagina_nao_localizados():
     st.markdown("### Qualidade cadastral — pacientes não localizados")
@@ -2224,6 +2490,41 @@ if pagina == "Visão Geral":
             fig,
             use_container_width=True
         )
+
+    c_titulo_equipes, c_ajuda_equipes = st.columns([12, 1])
+
+    with c_titulo_equipes:
+        st.markdown(
+            '<div class="section-title">Busca ativa por equipe</div>',
+            unsafe_allow_html=True,
+        )
+
+    with c_ajuda_equipes:
+        st.button(
+            "?",
+            help=(
+                "Como interpretar: as barras mostram o volume de pessoas em busca ativa "
+                "de cada equipe. As cores representam Em atraso, Vence em até 90 dias "
+                "e Sem registro de realização. "
+                "O losango representa a referência ajustada para aquela equipe, "
+                "calculada de acordo com o número de elegíveis. "
+                "Isso permite comparar equipes de tamanhos diferentes de forma mais justa. "
+                "Quando a barra ultrapassa o losango, a equipe apresenta busca ativa "
+                "acima da referência esperada para o seu porte."
+            ),
+            key="ajuda_busca_ativa_equipes",
+        )
+
+    equipe_media_chart(
+        get_equipes(
+            u,
+            m,
+            f_programa,
+            s,
+            fl
+        ),
+        "Busca ativa por equipe — volume e referência ajustada"
+    )
 
     unidade_chart(
         get_unidades(
