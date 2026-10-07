@@ -1991,6 +1991,142 @@ def busca_ativa(chave, programa_forcado=None):
     )
 
     # =====================================================
+    # EXPORTAÇÃO — SOMENTE PÁGINA BUSCA ATIVA
+    # =====================================================
+
+    if chave == "geral" and total > 0:
+
+        if st.button(
+            "⬇️ Preparar lista para exportação",
+            key="preparar_exportacao_busca_ativa",
+        ):
+
+            with st.spinner(
+                "Preparando lista nominal completa..."
+            ):
+
+                todas_linhas = []
+                export_limit = 500
+                export_offset = 0
+
+                while True:
+
+                    lote = rpc(
+                        "dashboard2_busca",
+                        {
+                            "p_busca":
+                                busca.strip() or None,
+
+                            "p_unidade": u,
+                            "p_equipe": e,
+                            "p_microarea": m,
+
+                            "p_programa":
+                                f_programa,
+
+                            "p_status": s,
+                            "p_fluxo": fl,
+
+                            "p_prioridade":
+                                prioridade,
+
+                            "p_limit":
+                                export_limit,
+
+                            "p_offset":
+                                export_offset,
+                        },
+                    ) or []
+
+                    if not lote:
+                        break
+
+                    todas_linhas.extend(lote)
+
+                    if len(lote) < export_limit:
+                        break
+
+                    export_offset += export_limit
+
+                df_export = pd.DataFrame(
+                    todas_linhas
+                )
+
+                if (
+                    not df_export.empty
+                    and "total_registros"
+                    in df_export.columns
+                ):
+                    df_export = df_export.drop(
+                        columns=["total_registros"]
+                    )
+
+                st.session_state[
+                    "df_export_busca_ativa"
+                ] = df_export
+
+
+        df_export = st.session_state.get(
+            "df_export_busca_ativa"
+        )
+
+        if (
+            df_export is not None
+            and not df_export.empty
+        ):
+
+            rename_export = {
+                "prioridade": "Prioridade",
+                "nome": "Nome",
+                "cns": "CNS",
+                "idade": "Idade",
+                "unidade": "Unidade",
+                "equipe": "Equipe",
+                "microarea": "Microárea",
+                "programa": "Programa",
+                "status_rastreamento":
+                    "Situação temporal",
+                "status_fluxo":
+                    "Fluxo operacional",
+                "dias_para_vencer":
+                    "Dias para vencer",
+                "data_ultima_realizacao":
+                    "Última realização",
+                "data_proxima_referencia":
+                    "Próxima referência",
+                "data_agendamento":
+                    "Agendamento",
+                "data_solicitacao":
+                    "Solicitação",
+                "situacao": "Situação",
+                "risco": "Risco",
+            }
+
+            df_export = df_export.rename(
+                columns=rename_export
+            )
+
+            csv_export = df_export.to_csv(
+                index=False,
+                sep=";",
+            ).encode("utf-8-sig")
+
+            st.download_button(
+                label="⬇️ Baixar lista nominal em CSV",
+                data=csv_export,
+                file_name=(
+                    "busca_ativa_nominal.csv"
+                ),
+                mime="text/csv",
+                key="download_busca_ativa",
+            )
+
+            st.caption(
+                f"{fmt(len(df_export))} "
+                "registro(s) preparados para exportação."
+            )    
+
+    # =====================================================
     # CABEÇALHO DA LISTA
     # =====================================================
 
@@ -2082,12 +2218,17 @@ def busca_ativa(chave, programa_forcado=None):
     # PRIORIDADE — IDENTIFICAÇÃO VISUAL
     # =====================================================
 
-    def prioridade_visual(valor):
-        if pd.isna(valor):
-            return valor
+    def prioridade_visual(row):
+        valor = row.get("prioridade")
+        status = str(row.get("status_rastreamento") or "").strip()
+        dias = pd.to_numeric(
+            row.get("dias_para_vencer"),
+            errors="coerce"
+        )
 
-        texto = str(valor)
+        texto = "" if pd.isna(valor) else str(valor).strip()
 
+        # Prioridades que já chegam corretamente do banco
         if "Prioridade 1" in texto:
             return "🔴 P1 — Em atraso"
 
@@ -2103,10 +2244,37 @@ def busca_ativa(chave, programa_forcado=None):
         if "Prioridade 5" in texto:
             return "🟣 P5 — Sem registro"
 
+        # Quando vier como "Seguimento DNA-HPV",
+        # calcula a prioridade pela situação temporal
+        if "Sem registro" in status:
+            return "🟣 P5 — Sem registro"
+
+        if "Em atraso" in status:
+            return "🔴 P1 — Em atraso"
+
+        # Usa os dias para vencer para separar P2, P3 e P4
+        if not pd.isna(dias):
+            if dias < 0:
+                return "🔴 P1 — Em atraso"
+
+            if dias <= 30:
+                return "🟠 P2 — Até 30 dias"
+
+            if dias <= 60:
+                return "🟡 P3 — 31–60 dias"
+
+            if dias <= 90:
+                return "🔵 P4 — 61–90 dias"
+
+        # Caso excepcional: mantém o conteúdo original
         return texto
 
+
     if "prioridade" in df.columns:
-        df["prioridade"] = df["prioridade"].apply(prioridade_visual)
+        df["prioridade"] = df.apply(
+            prioridade_visual,
+            axis=1
+        )
 
     st.dataframe(
         df[cols].rename(columns=rename),

@@ -59,14 +59,14 @@ PRAZO_ANOS = 2
 # Colunas que realmente usamos do export do VitaCare.
 # Reduz uso de memória em relação a carregar o CSV inteiro (arquivo pode passar de 400MB).
 COLUNAS_VITACARE = [
-    "N_CNS_DA_PESSOA_CADASTRADA",
-    "NOME_DA_PESSOA_CADASTRADA",
-    "DATA_DE_NASCIMENTO",
+    "N CNS DA PESSOA CADASTRADA",
+    "NOME DA PESSOA CADASTRADA",
+    "DATA DE NASCIMENTO",
     "SEXO",
-    "NOME_UNIDADE_DE_SAUDE",
-    "NOME_EQUIPE_DE_SAUDE",
-    "CODIGO_MICROAREA",
-    "SITUACAO_USUARIO",
+    "NOME UNIDADE DE SAUDE",
+    "NOME EQUIPE DE SAUDE",
+    "CODIGO MICROAREA",
+    "SITUACAO USUARIO",
 ]
 
 # =============================================================================
@@ -161,14 +161,14 @@ def ler_vitacare(pasta):
     )
 
     df = df.rename(columns={
-        "N_CNS_DA_PESSOA_CADASTRADA": "cns",
-        "NOME_DA_PESSOA_CADASTRADA":  "nome",
-        "DATA_DE_NASCIMENTO":         "data_nascimento",
+        "N CNS DA PESSOA CADASTRADA": "cns",
+        "NOME DA PESSOA CADASTRADA":  "nome",
+        "DATA DE NASCIMENTO":         "data_nascimento",
         "SEXO":                       "sexo",
-        "NOME_UNIDADE_DE_SAUDE":      "unidade",
-        "NOME_EQUIPE_DE_SAUDE":       "equipe",
-        "CODIGO_MICROAREA":           "microarea",
-        "SITUACAO_USUARIO":           "situacao_usuario",
+        "NOME UNIDADE DE SAUDE":      "unidade",
+        "NOME EQUIPE DE SAUDE":       "equipe",
+        "CODIGO MICROAREA":           "microarea",
+        "SITUACAO USUARIO":           "situacao_usuario",
     })
 
     df["cns"]              = df["cns"].apply(padronizar_cns)
