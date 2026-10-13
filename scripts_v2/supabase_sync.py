@@ -51,6 +51,14 @@ REGRAS = {
         "prazo_anos": 3,
         "populacional": True,
     },
+     "dna_hpv": {
+        "nome": "DNA-HPV",
+        "sexo": "F",
+        "idade_min": 25,
+        "idade_max": 64,
+        "prazo_anos": 5,
+        "populacional": True,
+    },
     "sangue_oculto": {
         "nome": "Sangue oculto nas fezes",
         "sexo": None,
@@ -447,6 +455,7 @@ def sync(reset_tracking=False):
             "idade": idade,
             "elegivel": True,
         })
+    if prog != "dna_hpv":
         r_rows.append({
             "paciente_id": pid,
             "programa_codigo": prog,
