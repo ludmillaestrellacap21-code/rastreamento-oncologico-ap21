@@ -937,6 +937,42 @@ def get_resumo(unidade, equipe, microarea, programa, status, fluxo):
 
 
 @st.cache_data(ttl=120, show_spinner=False)
+def get_unidades(programa, status, fluxo, unidade):
+    return rpc(
+        "dashboard2_unidades",
+        {
+            "p_programa": programa,
+            "p_status": status,
+            "p_fluxo": fluxo,
+            "p_unidade": unidade,
+        },
+    ) or []
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_distribuicao_equipes(
+    unidade,
+    equipe,
+    microarea,
+    programa,
+    status,
+    fluxo,
+):
+    return rpc(
+        "dashboard2_distribuicao_equipes",
+        {
+            "p_unidade": unidade,
+            "p_equipe": equipe,
+            "p_microarea": microarea,
+            "p_programa": programa,
+            "p_status": status,
+            "p_fluxo": fluxo,
+        },
+        stop_on_error=False,
+    ) or []
+
+
+@st.cache_data(ttl=120, show_spinner=False)
 def get_status(unidade, equipe, microarea, programa):
     return rpc("dashboard2_status", {
         "p_unidade": unidade, "p_equipe": equipe,
@@ -956,14 +992,6 @@ def get_fluxo(unidade, equipe, microarea, programa):
 def get_programas(unidade, equipe, microarea):
     return rpc("dashboard2_programas", {
         "p_unidade": unidade, "p_equipe": equipe, "p_microarea": microarea,
-    }) or []
-
-
-@st.cache_data(ttl=120, show_spinner=False)
-def get_unidades(programa, status, fluxo, unidade):
-    return rpc("dashboard2_unidades", {
-        "p_programa": programa, "p_status": status,
-        "p_fluxo": fluxo, "p_unidade": unidade,
     }) or []
 
 
@@ -1406,13 +1434,27 @@ def fluxo_chart(rows, titulo):
 
     df = df.sort_values("total", ascending=True)
 
+    df["percentual"] = (
+        df["total"]
+        / df["total"].sum()
+        * 100
+    ).fillna(0)
+
+    df["rotulo"] = df.apply(
+        lambda r: (
+            f"{int(r['total'])} "
+            f"({r['percentual']:.1f}%)"
+        ).replace(".", ","),
+        axis=1,
+    )
+
     fig = px.bar(
         df,
         x="total",
         y="status_fluxo",
         orientation="h",
         color="status_fluxo",
-        text="total",
+        text="rotulo",
         color_discrete_map=FLUXO_COLORS,
     )
 
@@ -1638,24 +1680,104 @@ def equipe_media_chart(rows, titulo="Busca ativa por equipe"):
         config={"displayModeBar": False},
     )
 
-def unidade_chart(rows, titulo):
+def distribuicao_chart(
+    rows,
+    dimensao,
+    titulo,
+):
     df = pd.DataFrame(rows)
+
     if df.empty:
-        st.info("Sem dados para os filtros selecionados.")
+        st.info(
+            "Sem dados para os filtros selecionados."
+        )
         return
-    df = df.sort_values("total")
-    fig = px.bar(df, x="total", y="unidade", orientation="h", text="total",
-                 title=titulo, color_discrete_sequence=[RIO_BLUE])
-    fig.update_traces(textposition="outside")
+
+    df["total"] = pd.to_numeric(
+        df["total"],
+        errors="coerce"
+    ).fillna(0)
+
+    total_geral = df["total"].sum()
+
+    df["percentual"] = (
+        df["total"]
+        / total_geral
+        * 100
+    ).fillna(0)
+
+    df["rotulo"] = df.apply(
+        lambda r: (
+            f"{int(r['total'])} "
+            f"({r['percentual']:.1f}%)"
+        ).replace(".", ","),
+        axis=1,
+    )
+
+    df = df.sort_values(
+        "total",
+        ascending=True,
+    )
+
+    fig = px.bar(
+        df,
+        x="total",
+        y=dimensao,
+        orientation="h",
+        text="rotulo",
+        title=titulo,
+        color_discrete_sequence=[
+            RIO_BLUE
+        ],
+        custom_data=[
+            "percentual"
+        ],
+    )
+
+    fig.update_traces(
+        textposition="outside",
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Total: %{x:.0f}<br>"
+            "Percentual: "
+            "%{customdata[0]:.1f}%"
+            "<extra></extra>"
+        ),
+    )
+
     fig.update_layout(
-        height=420,
-        margin=dict(l=20, r=30, t=60, b=35),
+        height=max(
+            420,
+            len(df) * 32,
+        ),
+        margin=dict(
+            l=20,
+            r=80,
+            t=60,
+            b=35,
+        ),
         paper_bgcolor="white",
         plot_bgcolor="white",
         xaxis_title="Total",
-        yaxis_title=""
+        yaxis_title="",
     )
-    st.plotly_chart(fig, use_container_width=True)
+
+    fig.update_xaxes(
+        gridcolor="#EEF2F6",
+        zeroline=False,
+    )
+
+    fig.update_yaxes(
+        showgrid=False,
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            "displayModeBar": False
+        },
+    )
 
 def atualizacoes_visao_geral():
     dados = get_atualizacoes()
@@ -2694,15 +2816,33 @@ if pagina == "Visão Geral":
         "Busca ativa por equipe — volume e referência ajustada"
     )
 
-    unidade_chart(
-        get_unidades(
-            f_programa,
-            s,
-            fl,
-            u
-        ),
-        "Distribuição por unidade"
-    )
+    if u is None:
+
+        distribuicao_chart(
+            get_unidades(
+                f_programa,
+                s,
+                fl,
+                u,
+            ),
+            "unidade",
+            "Distribuição por unidade",
+        )
+
+    else:
+
+        distribuicao_chart(
+            get_distribuicao_equipes(
+                u,
+                e,
+                m,
+                f_programa,
+                s,
+                fl,
+            ),
+            "equipe",
+            "Distribuição por equipe",
+        )
 
 
 # =========================================================
@@ -2750,15 +2890,33 @@ elif pagina == "Mamografia":
             "Fluxo — Mamografia"
         )
 
-    unidade_chart(
-        get_unidades(
-            programa,
-            s,
-            fl,
-            u
-        ),
-        "Mamografia por unidade"
-    )
+    if u is None:
+
+        distribuicao_chart(
+            get_unidades(
+                programa,
+                s,
+                fl,
+                u,
+            ),
+            "unidade",
+            "Mamografia por unidade",
+        )
+
+    else:
+
+        distribuicao_chart(
+            get_distribuicao_equipes(
+                u,
+                e,
+                m,
+                programa,
+                s,
+                fl,
+            ),
+            "equipe",
+            "Mamografia por equipe",
+        )
 
     busca_ativa(
         "mamografia",
@@ -2810,15 +2968,33 @@ elif pagina == "Colo do Útero":
             "Fluxo laboratorial — Citopatológico"
         )
 
-    unidade_chart(
-        get_unidades(
-            programa,
-            s,
-            fl,
-            u
-        ),
-        "Citopatológico por unidade"
-    )
+    if u is None:
+
+        distribuicao_chart(
+            get_unidades(
+                programa,
+                s,
+                fl,
+                u,
+            ),
+            "unidade",
+            "Citopatológico por unidade",
+        )
+
+    else:
+
+        distribuicao_chart(
+            get_distribuicao_equipes(
+                u,
+                e,
+                m,
+                programa,
+                s,
+                fl,
+            ),
+            "equipe",
+            "Citopatológico por equipe",
+        )
 
     busca_ativa(
         "citopatologico",
@@ -2868,15 +3044,33 @@ elif pagina == "DNA-HPV":
             "Conduta — DNA-HPV"
         )
 
-    unidade_chart(
-        get_unidades(
-            programa,
-            s,
-            fl,
-            u
-        ),
-        "DNA-HPV por unidade"
-    )
+    if u is None:
+
+        distribuicao_chart(
+            get_unidades(
+                programa,
+                s,
+                fl,
+                u,
+            ),
+            "unidade",
+            "DNA-HPV por unidade",
+        )
+
+    else:
+
+        distribuicao_chart(
+            get_distribuicao_equipes(
+                u,
+                e,
+                m,
+                programa,
+                s,
+                fl,
+            ),
+            "equipe",
+            "DNA-HPV por equipe",
+        )
 
     busca_ativa(
         "dna_hpv",
@@ -2923,15 +3117,33 @@ elif pagina == "Colorretal":
             "Fluxo laboratorial — Sangue oculto / FIT"
         )
 
-    unidade_chart(
-        get_unidades(
-            programa,
-            s,
-            fl,
-            u
-        ),
-        "Sangue oculto / FIT por unidade"
-    )
+    if u is None:
+
+        distribuicao_chart(
+            get_unidades(
+                programa,
+                s,
+                fl,
+                u,
+            ),
+            "unidade",
+            "Sangue oculto / FIT por unidade",
+        )
+
+    else:
+
+        distribuicao_chart(
+            get_distribuicao_equipes(
+                u,
+                e,
+                m,
+                programa,
+                s,
+                fl,
+            ),
+            "equipe",
+            "Sangue oculto / FIT por equipe",
+        )
 
     st.divider()
 

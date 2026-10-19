@@ -160,25 +160,233 @@ def enviar_em_lotes(sb, tabela, rows, conflito, rotulo=None):
 def buscar_ids_pacientes(sb):
     ids = {}
     offset = 0
+
     print("\nLendo IDs de pacientes do Supabase...")
+
     while True:
         res = (
             sb.table("pacientes")
             .select("id,cns")
+            .order("id")
             .range(offset, offset + 999)
             .execute()
             .data
         )
+
         if not res:
             break
-        ids.update({str(x["cns"]).strip(): x["id"] for x in res})
+
+        for item in res:
+            cns = item.get("cns")
+
+            if cns is None:
+                continue
+
+            cns = str(cns).strip()
+
+            if not cns:
+                continue
+
+            ids[cns] = item["id"]
+
         if len(res) < 1000:
             break
+
         offset += 1000
+
         if offset % 50000 == 0:
-            print(f"IDs carregados: {len(ids):,}")
-    print(f"IDs de pacientes disponíveis: {len(ids):,}")
+            print(
+                f"IDs carregados: "
+                f"{len(ids):,}"
+            )
+
+    print(
+        f"IDs de pacientes dispon?veis: "
+        f"{len(ids):,}"
+    )
+
     return ids
+
+
+
+def desativar_elegibilidades_obsoletas(sb, e_rows):
+    """
+    Desativa somente elegibilidades obsoletas de pacientes
+    que possuem equipe v?lida.
+
+    Pacientes sem equipe permanecem intactos no hist?rico.
+    """
+
+    atuais = {
+        (
+            str(r["paciente_id"]),
+            str(r["programa_codigo"])
+        )
+        for r in e_rows
+    }
+
+    print("\nLendo pacientes com equipe v?lida...")
+
+    pacientes_validos = set()
+    offset = 0
+
+    while True:
+        res = (
+            sb.table("pacientes")
+            .select("id,equipe")
+            .order("id")
+            .range(offset, offset + 999)
+            .execute()
+            .data
+        )
+
+        if not res:
+            break
+
+        for item in res:
+            equipe = item.get("equipe")
+
+            if equipe is None:
+                continue
+
+            equipe = str(equipe).strip()
+
+            if (
+                equipe
+                and equipe.lower() != "sem equipe"
+            ):
+                pacientes_validos.add(
+                    str(item["id"])
+                )
+
+        if len(res) < 1000:
+            break
+
+        offset += 1000
+
+        if offset % 50000 == 0:
+            print(
+                f"Pacientes analisados: "
+                f"{offset:,}"
+            )
+
+    print(
+        f"Pacientes com equipe v?lida: "
+        f"{len(pacientes_validos):,}"
+    )
+
+    print("\nVerificando elegibilidades ativas...")
+
+    obsoletos = []
+    offset = 0
+    ativos_validos = 0
+
+    while True:
+        res = (
+            sb.table("elegibilidade_rastreamento")
+            .select("paciente_id,programa_codigo")
+            .eq("elegivel", True)
+            .order("paciente_id")
+            .order("programa_codigo")
+            .range(offset, offset + 999)
+            .execute()
+            .data
+        )
+
+        if not res:
+            break
+
+        for item in res:
+            paciente_id = str(
+                item["paciente_id"]
+            )
+
+            if paciente_id not in pacientes_validos:
+                continue
+
+            ativos_validos += 1
+
+            chave = (
+                paciente_id,
+                str(item["programa_codigo"])
+            )
+
+            if chave not in atuais:
+                obsoletos.append(chave)
+
+        if len(res) < 1000:
+            break
+
+        offset += 1000
+
+        if offset % 50000 == 0:
+            print(
+                f"Elegibilidades analisadas: "
+                f"{offset:,}"
+            )
+
+    print(
+        f"Elegibilidades ativas com equipe: "
+        f"{ativos_validos:,}"
+    )
+
+    print(
+        f"Elegibilidades obsoletas encontradas: "
+        f"{len(obsoletos):,}"
+    )
+
+    if not obsoletos:
+        return
+
+    por_programa = {}
+
+    for paciente_id, programa in obsoletos:
+        por_programa.setdefault(
+            programa,
+            []
+        ).append(paciente_id)
+
+    total = 0
+
+    for programa, pacientes in por_programa.items():
+
+        for inicio_lote in range(
+            0,
+            len(pacientes),
+            100
+        ):
+            lote = pacientes[
+                inicio_lote:inicio_lote + 100
+            ]
+
+            (
+                sb.table(
+                    "elegibilidade_rastreamento"
+                )
+                .update({
+                    "elegivel": False
+                })
+                .eq(
+                    "programa_codigo",
+                    programa
+                )
+                .eq(
+                    "elegivel",
+                    True
+                )
+                .in_(
+                    "paciente_id",
+                    lote
+                )
+                .execute()
+            )
+
+            total += len(lote)
+
+    print(
+        f"Elegibilidades antigas desativadas: "
+        f"{total:,}"
+    )
 
 
 def idade_atual(row):
@@ -442,34 +650,51 @@ def sync(reset_tracking=False):
     for _, r in base.iterrows():
         cns = str(r["cns"]).strip()
         pid = ids.get(cns)
+
         if not pid:
             sem_id += 1
             continue
+
         prog = val(r.get("programa_monitorado"))
+
         if not prog:
             continue
+
         idade = idade_atual(r)
+
         e_rows.append({
             "paciente_id": pid,
             "programa_codigo": prog,
             "idade": idade,
             "elegivel": True,
         })
-    if prog != "dna_hpv":
-        r_rows.append({
-            "paciente_id": pid,
-            "programa_codigo": prog,
-            "status_rastreamento": val(r.get("status_rastreamento")) or "Sem registro de realização",
-            "status_fluxo": val(r.get("status_fluxo")),
-            "risco": val(r.get("risco")),
-            "ultima_data_agendamento": norm_date(r.get("data_agendamento")),
-            "ultima_data_solicitacao": norm_date(r.get("data_solicitacao")),
-            "ultima_situacao": val(r.get("situacao")),
-            "ultimo_procedimento": val(r.get("procedimento")),
-        })
+
+        # DNA-HPV ? atualizado pelas planilhas e n?o deve
+        # ser sobrescrito pela carga do VitaCare.
+        if prog != "dna_hpv":
+            r_rows.append({
+                "paciente_id": pid,
+                "programa_codigo": prog,
+                "status_rastreamento": (
+                    val(r.get("status_rastreamento"))
+                    or "Sem registro de realiza??o"
+                ),
+                "status_fluxo": val(r.get("status_fluxo")),
+                "risco": val(r.get("risco")),
+                "ultima_data_agendamento": norm_date(
+                    r.get("data_agendamento")
+                ),
+                "ultima_data_solicitacao": norm_date(
+                    r.get("data_solicitacao")
+                ),
+                "ultima_situacao": val(r.get("situacao")),
+                "ultimo_procedimento": val(r.get("procedimento")),
+            })
 
     if sem_id:
         print(f"Aviso: {sem_id:,} combinações sem paciente correspondente.")
+
+    desativar_elegibilidades_obsoletas(sb, e_rows)
 
     enviar_em_lotes(sb, "elegibilidade_rastreamento", e_rows, "paciente_id,programa_codigo", "Elegibilidades")
     enviar_em_lotes(sb, "rastreamentos", r_rows, "paciente_id,programa_codigo", "Rastreamentos")
